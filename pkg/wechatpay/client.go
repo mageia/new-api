@@ -8,19 +8,18 @@ import (
 	"github.com/wechatpay-apiv3/wechatpay-go/core/option"
 	"github.com/wechatpay-apiv3/wechatpay-go/services/payments/native"
 	"github.com/wechatpay-apiv3/wechatpay-go/utils"
-
-	"github.com/QuantumNous/new-api/service"
-	"github.com/QuantumNous/new-api/setting"
 )
 
 type Config struct {
-	MchID            string
-	AppID            string
-	APIv3Key         string
-	PrivateKeyPEM    string
-	MerchantSerialNo string
-	PublicKeyID      string
-	PublicKeyPEM     string
+	MchID              string
+	AppID              string
+	APIv3Key           string
+	PrivateKeyPEM      string
+	MerchantSerialNo   string
+	PublicKeyID        string
+	PublicKeyPEM       string
+	DefaultNotifyURL   string
+	DefaultDescription string
 }
 
 type NativeOrderRequest struct {
@@ -82,14 +81,10 @@ func NewClient(cfg Config) (Client, error) {
 	return &sdkClient{cfg: cfg, cli: cli}, nil
 }
 
-func (c *sdkClient) CreateNativeOrder(ctx context.Context, req NativeOrderRequest) (*NativeOrderResponse, error) {
-	if c.cli == nil {
-		return nil, fmt.Errorf("wechat pay client is not initialized")
-	}
-
+func (c *sdkClient) resolveNativeOrderRequest(req NativeOrderRequest) NativeOrderRequest {
 	description := req.Description
 	if description == "" {
-		description = setting.WeChatPayOrderDescription
+		description = c.cfg.DefaultDescription
 	}
 	if description == "" {
 		description = "账户充值"
@@ -97,26 +92,34 @@ func (c *sdkClient) CreateNativeOrder(ctx context.Context, req NativeOrderReques
 
 	notifyURL := req.NotifyURL
 	if notifyURL == "" {
-		notifyURL = setting.WeChatPayNotifyUrl
+		notifyURL = c.cfg.DefaultNotifyURL
 	}
-	if notifyURL == "" {
-		notifyURL = service.GetCallbackAddress() + "/api/wechat/notify"
+	req.Description = description
+	req.NotifyURL = notifyURL
+	return req
+}
+
+func (c *sdkClient) CreateNativeOrder(ctx context.Context, req NativeOrderRequest) (*NativeOrderResponse, error) {
+	if c.cli == nil {
+		return nil, fmt.Errorf("wechat pay client is not initialized")
 	}
+
+	resolvedReq := c.resolveNativeOrderRequest(req)
 
 	prepayReq := native.PrepayRequest{
 		Appid:       wechatpaycore.String(c.cfg.AppID),
 		Mchid:       wechatpaycore.String(c.cfg.MchID),
-		Description: wechatpaycore.String(description),
-		OutTradeNo:  wechatpaycore.String(req.OutTradeNo),
-		NotifyUrl:   wechatpaycore.String(notifyURL),
+		Description: wechatpaycore.String(resolvedReq.Description),
+		OutTradeNo:  wechatpaycore.String(resolvedReq.OutTradeNo),
+		NotifyUrl:   wechatpaycore.String(resolvedReq.NotifyURL),
 		Amount: &native.Amount{
-			Total:    wechatpaycore.Int64(req.AmountFen),
+			Total:    wechatpaycore.Int64(resolvedReq.AmountFen),
 			Currency: wechatpaycore.String("CNY"),
 		},
 	}
-	if req.ClientIP != "" {
+	if resolvedReq.ClientIP != "" {
 		prepayReq.SceneInfo = &native.SceneInfo{
-			PayerClientIp: wechatpaycore.String(req.ClientIP),
+			PayerClientIp: wechatpaycore.String(resolvedReq.ClientIP),
 		}
 	}
 

@@ -40,6 +40,7 @@ type wechatPaySettingSnapshot struct {
 	UnitPrice        float64
 	NotifyURL        string
 	OrderDescription string
+	QuotaDisplayType string
 	PayMethods       []map[string]string
 }
 
@@ -66,6 +67,7 @@ func snapshotWeChatPaySettings() wechatPaySettingSnapshot {
 		UnitPrice:        setting.WeChatPayUnitPrice,
 		NotifyURL:        setting.WeChatPayNotifyUrl,
 		OrderDescription: setting.WeChatPayOrderDescription,
+		QuotaDisplayType: operation_setting.GetGeneralSetting().QuotaDisplayType,
 		PayMethods:       payMethods,
 	}
 }
@@ -83,6 +85,7 @@ func restoreWeChatPaySettings(snapshot wechatPaySettingSnapshot) {
 	setting.WeChatPayUnitPrice = snapshot.UnitPrice
 	setting.WeChatPayNotifyUrl = snapshot.NotifyURL
 	setting.WeChatPayOrderDescription = snapshot.OrderDescription
+	operation_setting.GetGeneralSetting().QuotaDisplayType = snapshot.QuotaDisplayType
 	operation_setting.PayMethods = snapshot.PayMethods
 }
 
@@ -213,6 +216,25 @@ func assertSuccessContains(t *testing.T, recorder *httptest.ResponseRecorder, ex
 	}
 }
 
+func assertErrorData(t *testing.T, recorder *httptest.ResponseRecorder, expected string) {
+	t.Helper()
+
+	var response struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+		Data    string `json:"data"`
+	}
+	if err := common.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if response.Success {
+		t.Fatalf("expected error response, got body: %s", recorder.Body.String())
+	}
+	if response.Data != expected {
+		t.Fatalf("expected error data %q, got %q, body: %s", expected, response.Data, recorder.Body.String())
+	}
+}
+
 func assertTopupPending(t *testing.T, paymentMethod string) {
 	t.Helper()
 
@@ -225,6 +247,18 @@ func assertTopupPending(t *testing.T, paymentMethod string) {
 	}
 	if topUp.Status != common.TopUpStatusPending {
 		t.Fatalf("expected pending topup, got %q", topUp.Status)
+	}
+}
+
+func assertTopupStatus(t *testing.T, expected string) {
+	t.Helper()
+
+	var topUp model.TopUp
+	if err := model.DB.First(&topUp).Error; err != nil {
+		t.Fatalf("failed to query topup: %v", err)
+	}
+	if topUp.Status != expected {
+		t.Fatalf("expected topup status %q, got %q", expected, topUp.Status)
 	}
 }
 
@@ -336,6 +370,21 @@ func TestRequestWeChatAmountReturnsCNYAmount(t *testing.T) {
 	assertSuccessMessage(t, recorder, "72")
 }
 
+func TestRequestWeChatAmountRejectsBelowTokenModeMinTopup(t *testing.T) {
+	setupTopupControllerTestEnv(t)
+	seedTopupUser(t, 1, "default")
+	seedWeChatPayConfig()
+	setting.WeChatPayMinTopUp = 2
+	operation_setting.GetGeneralSetting().QuotaDisplayType = operation_setting.QuotaDisplayTypeTokens
+
+	ctx, recorder := newTopupTestContext(t, "POST", "/api/user/wechat/amount", map[string]any{
+		"amount": int64(common.QuotaPerUnit*2) - 1,
+	}, 1)
+	RequestWeChatAmount(ctx)
+
+	assertErrorData(t, recorder, "充值数量不能小于 1000000")
+}
+
 func TestRequestWeChatPayCreatesPendingOrderAndReturnsCodeURL(t *testing.T) {
 	setupTopupControllerTestEnv(t)
 	seedTopupUser(t, 1, "default")
@@ -362,4 +411,29 @@ func TestRequestWeChatPayCreatesPendingOrderAndReturnsCodeURL(t *testing.T) {
 
 	assertSuccessContains(t, recorder, "mock-code-url")
 	assertTopupPending(t, "wechat_pay")
+}
+
+func TestRequestWeChatPayMarksOrderFailedWhenCreateNativeOrderFails(t *testing.T) {
+	setupTopupControllerTestEnv(t)
+	seedTopupUser(t, 1, "default")
+	seedWeChatPayConfig()
+
+	originalFactory := newWeChatPayClient
+	newWeChatPayClient = func() (wechatpay.Client, error) {
+		return fakeWeChatPayClient{
+			createNativeOrderFunc: func(_ context.Context, req wechatpay.NativeOrderRequest) (*wechatpay.NativeOrderResponse, error) {
+				return nil, fmt.Errorf("upstream failed")
+			},
+		}, nil
+	}
+	defer func() { newWeChatPayClient = originalFactory }()
+
+	ctx, recorder := newTopupTestContext(t, "POST", "/api/user/wechat/pay", map[string]any{
+		"amount":         10,
+		"payment_method": "wechat_pay",
+	}, 1)
+	RequestWeChatPay(ctx)
+
+	assertErrorData(t, recorder, "拉起支付失败")
+	assertTopupStatus(t, common.TopUpStatusFailed)
 }

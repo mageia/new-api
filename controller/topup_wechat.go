@@ -8,6 +8,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/pkg/wechatpay"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
@@ -34,6 +35,18 @@ var newWeChatPayClient = func() (wechatpay.Client, error) {
 		MerchantSerialNo: setting.WeChatPayMerchantSerialNo,
 		PublicKeyID:      setting.WeChatPayPublicKeyID,
 		PublicKeyPEM:     setting.WeChatPayPublicKey,
+		DefaultNotifyURL: func() string {
+			if setting.WeChatPayNotifyUrl != "" {
+				return setting.WeChatPayNotifyUrl
+			}
+			return service.GetCallbackAddress() + "/api/wechat/notify"
+		}(),
+		DefaultDescription: func() string {
+			if setting.WeChatPayOrderDescription != "" {
+				return setting.WeChatPayOrderDescription
+			}
+			return "账户充值"
+		}(),
 	}
 	return wechatpay.NewClient(cfg)
 }
@@ -68,6 +81,14 @@ func getWeChatPayMoney(amount int64, group string) (decimal.Decimal, int64, int6
 	return yuan, fen, normalized.IntPart()
 }
 
+func getWeChatPayMinTopup() int64 {
+	minTopup := decimal.NewFromInt(int64(setting.WeChatPayMinTopUp))
+	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
+		minTopup = minTopup.Mul(decimal.NewFromFloat(common.QuotaPerUnit))
+	}
+	return minTopup.IntPart()
+}
+
 func RequestWeChatAmount(c *gin.Context) {
 	var req WeChatPayRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -78,8 +99,9 @@ func RequestWeChatAmount(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "管理员未开启微信支付"})
 		return
 	}
-	if req.Amount < int64(setting.WeChatPayMinTopUp) {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %d", setting.WeChatPayMinTopUp)})
+	minTopup := getWeChatPayMinTopup()
+	if req.Amount < minTopup {
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %d", minTopup)})
 		return
 	}
 
@@ -112,8 +134,9 @@ func RequestWeChatPay(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "管理员未开启微信支付"})
 		return
 	}
-	if req.Amount < int64(setting.WeChatPayMinTopUp) {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %d", setting.WeChatPayMinTopUp)})
+	minTopup := getWeChatPayMinTopup()
+	if req.Amount < minTopup {
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %d", minTopup)})
 		return
 	}
 
