@@ -50,6 +50,14 @@ type sdkClient struct {
 	cli *wechatpaycore.Client
 }
 
+func (c Config) Validate() error {
+	if c.MchID == "" || c.AppID == "" || c.APIv3Key == "" || c.PrivateKeyPEM == "" ||
+		c.MerchantSerialNo == "" || c.PublicKeyID == "" || c.PublicKeyPEM == "" {
+		return fmt.Errorf("wechat pay config is incomplete")
+	}
+	return nil
+}
+
 func NewClient(cfg Config) (Client, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err

@@ -1,6 +1,9 @@
 package wechatpay
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestValidateConfigRequiresAllFields(t *testing.T) {
 	cfg := Config{}
@@ -9,7 +12,7 @@ func TestValidateConfigRequiresAllFields(t *testing.T) {
 	}
 }
 
-func TestBuildNotifyResultRejectsNonCNY(t *testing.T) {
+func TestNotifyResultValidateBusinessFieldsRejectsNonCNY(t *testing.T) {
 	result := &NotifyResult{Currency: "USD"}
 	if err := result.ValidateBusinessFields("wx-app", "mch-id"); err == nil {
 		t.Fatal("expected currency validation error")
@@ -20,5 +23,35 @@ func TestNewClientReturnsConfigErrorFirst(t *testing.T) {
 	_, err := NewClient(Config{})
 	if err == nil {
 		t.Fatal("expected config validation error")
+	}
+}
+
+func TestSDKClientCreateNativeOrderReturnsNotImplemented(t *testing.T) {
+	client := &sdkClient{}
+
+	resp, err := client.CreateNativeOrder(context.Background(), NativeOrderRequest{})
+	if err == nil {
+		t.Fatal("expected not implemented error")
+	}
+	if err.Error() != "not implemented" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp != nil {
+		t.Fatalf("expected nil response, got %+v", resp)
+	}
+}
+
+func TestSDKClientVerifyAndDecryptNotifyReturnsNotImplemented(t *testing.T) {
+	client := &sdkClient{}
+
+	resp, err := client.VerifyAndDecryptNotify(context.Background(), map[string]string{}, nil)
+	if err == nil {
+		t.Fatal("expected not implemented error")
+	}
+	if err.Error() != "not implemented" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp != nil {
+		t.Fatalf("expected nil response, got %+v", resp)
 	}
 }
