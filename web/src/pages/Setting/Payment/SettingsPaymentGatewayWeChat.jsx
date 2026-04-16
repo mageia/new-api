@@ -43,8 +43,9 @@ export default function SettingsPaymentGatewayWeChat(props) {
     WeChatPayUnitPrice: 1,
     WeChatPayMinTopUp: 1,
     WeChatPayNotifyUrl: '',
-    WeChatPayOrderDescription: '账户充值',
+    WeChatPayOrderDescription: '',
   });
+  const [originInputs, setOriginInputs] = useState({});
 
   useEffect(() => {
     if (props.options && formApiRef.current) {
@@ -70,10 +71,10 @@ export default function SettingsPaymentGatewayWeChat(props) {
             ? parseFloat(props.options.WeChatPayMinTopUp)
             : 1,
         WeChatPayNotifyUrl: props.options.WeChatPayNotifyUrl || '',
-        WeChatPayOrderDescription:
-          props.options.WeChatPayOrderDescription || '账户充值',
+        WeChatPayOrderDescription: props.options.WeChatPayOrderDescription || '',
       };
       setInputs(currentInputs);
+      setOriginInputs({ ...currentInputs });
       formApiRef.current.setValues(currentInputs);
     }
   }, [props.options]);
@@ -93,32 +94,60 @@ export default function SettingsPaymentGatewayWeChat(props) {
 
     setLoading(true);
     try {
-      const options = [
-        {
+      const options = [];
+      if (originInputs.WeChatPayEnabled !== inputs.WeChatPayEnabled) {
+        options.push({
           key: 'WeChatPayEnabled',
           value: inputs.WeChatPayEnabled ? 'true' : 'false',
-        },
-        { key: 'WeChatPayMchID', value: inputs.WeChatPayMchID || '' },
-        { key: 'WeChatPayAppID', value: inputs.WeChatPayAppID || '' },
-        {
+        });
+      }
+      if (originInputs.WeChatPayMchID !== inputs.WeChatPayMchID) {
+        options.push({ key: 'WeChatPayMchID', value: inputs.WeChatPayMchID || '' });
+      }
+      if (originInputs.WeChatPayAppID !== inputs.WeChatPayAppID) {
+        options.push({ key: 'WeChatPayAppID', value: inputs.WeChatPayAppID || '' });
+      }
+      if (
+        originInputs.WeChatPayMerchantSerialNo !== inputs.WeChatPayMerchantSerialNo
+      ) {
+        options.push({
           key: 'WeChatPayMerchantSerialNo',
           value: inputs.WeChatPayMerchantSerialNo || '',
-        },
-        { key: 'WeChatPayPublicKeyID', value: inputs.WeChatPayPublicKeyID || '' },
-        {
+        });
+      }
+      if (originInputs.WeChatPayPublicKeyID !== inputs.WeChatPayPublicKeyID) {
+        options.push({
+          key: 'WeChatPayPublicKeyID',
+          value: inputs.WeChatPayPublicKeyID || '',
+        });
+      }
+      if (originInputs.WeChatPayUnitPrice !== inputs.WeChatPayUnitPrice) {
+        options.push({
           key: 'WeChatPayUnitPrice',
           value: String(inputs.WeChatPayUnitPrice || 1),
-        },
-        {
+        });
+      }
+      if (originInputs.WeChatPayMinTopUp !== inputs.WeChatPayMinTopUp) {
+        options.push({
           key: 'WeChatPayMinTopUp',
           value: String(inputs.WeChatPayMinTopUp || 1),
-        },
-        { key: 'WeChatPayNotifyUrl', value: inputs.WeChatPayNotifyUrl || '' },
-        {
+        });
+      }
+      if (originInputs.WeChatPayNotifyUrl !== inputs.WeChatPayNotifyUrl) {
+        options.push({
+          key: 'WeChatPayNotifyUrl',
+          value: inputs.WeChatPayNotifyUrl || '',
+        });
+      }
+      if (
+        originInputs.WeChatPayOrderDescription !==
+        inputs.WeChatPayOrderDescription
+      ) {
+        options.push({
           key: 'WeChatPayOrderDescription',
           value: inputs.WeChatPayOrderDescription || '',
-        },
-      ];
+        });
+      }
 
       if (inputs.WeChatPayAPIv3Key && inputs.WeChatPayAPIv3Key !== '') {
         options.push({
@@ -153,6 +182,7 @@ export default function SettingsPaymentGatewayWeChat(props) {
         });
       } else {
         showSuccess(t('更新成功'));
+        setOriginInputs({ ...inputs });
         props.refresh?.();
       }
     } catch (error) {

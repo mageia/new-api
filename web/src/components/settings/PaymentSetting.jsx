@@ -61,7 +61,7 @@ const PaymentSetting = () => {
     WeChatPayUnitPrice: 1,
     WeChatPayMinTopUp: 1,
     WeChatPayNotifyUrl: '',
-    WeChatPayOrderDescription: '账户充值',
+    WeChatPayOrderDescription: '',
   });
 
   let [loading, setLoading] = useState(false);
