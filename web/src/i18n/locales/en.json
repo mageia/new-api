@@ -3529,6 +3529,7 @@
     "请输入微信支付公钥 ID": "Please enter WeChat Pay public key ID",
     "敏感信息不显示，留空则不更新": "Sensitive info is hidden; leave blank to keep unchanged",
     "例如：账户充值": "e.g. Account top-up",
+    "订单描述": "Order Description",
     "（当前仅支持易支付接口，默认使用上方服务器地址作为回调地址！）": "(Currently only supports Epay interface, the default callback address is the server address above!)",
     "，当前无生效订阅，将自动使用钱包": ", no active subscription. Wallet will be used automatically.",
     "，时间：": ",time:",
