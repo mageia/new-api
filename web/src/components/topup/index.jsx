@@ -533,13 +533,19 @@ const TopUp = () => {
           const enableOnlineTopUp = data.enable_online_topup || false;
           const enableCreemTopUp = data.enable_creem_topup || false;
           const enableWeChatTopUp = data.enable_wechat_topup || false;
+          const enableWaffoTopUp = data.enable_waffo_topup || false;
+          const isWeChatOnlyTopUp =
+            enableWeChatTopUp &&
+            !enableOnlineTopUp &&
+            !enableStripeTopUp &&
+            !enableWaffoTopUp;
           const minTopUpValue = enableOnlineTopUp
             ? data.min_topup
             : enableStripeTopUp
               ? data.stripe_min_topup
               : enableWeChatTopUp
                 ? data.wechat_min_topup
-              : data.enable_waffo_topup
+                : enableWaffoTopUp
                 ? data.waffo_min_topup
                 : 1;
           setEnableOnlineTopUp(enableOnlineTopUp);
@@ -547,7 +553,6 @@ const TopUp = () => {
           setEnableCreemTopUp(enableCreemTopUp);
           setEnableWeChatTopUp(enableWeChatTopUp);
           setWechatMinTopUp(data.wechat_min_topup || 1);
-          const enableWaffoTopUp = data.enable_waffo_topup || false;
           setEnableWaffoTopUp(enableWaffoTopUp);
           setWaffoPayMethods(data.waffo_pay_methods || []);
           setWaffoMinTopUp(data.waffo_min_topup || 1);
@@ -568,7 +573,11 @@ const TopUp = () => {
           }
 
           // 初始化显示实付金额
-          getAmount(minTopUpValue);
+          if (isWeChatOnlyTopUp) {
+            getWeChatAmount(minTopUpValue);
+          } else {
+            getAmount(minTopUpValue);
+          }
         } catch (e) {
           setPayMethods([]);
         }
@@ -766,6 +775,16 @@ const TopUp = () => {
   const selectPresetAmount = (preset) => {
     setTopUpCount(preset.value);
     setSelectedPreset(preset.value);
+
+    const isWeChatOnlyTopUp =
+      enableWeChatTopUp &&
+      !enableOnlineTopUp &&
+      !enableStripeTopUp &&
+      !enableWaffoTopUp;
+    if (isWeChatOnlyTopUp) {
+      getWeChatAmount(preset.value);
+      return;
+    }
 
     // 计算实际支付金额，考虑折扣
     const discount = preset.discount || topupInfo.discount[preset.value] || 1.0;

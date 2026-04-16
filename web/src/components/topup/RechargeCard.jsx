@@ -269,7 +269,8 @@ const RechargeCard = ({
                           const shouldUseWeChatAmount =
                             enableWeChatTopUp &&
                             !enableOnlineTopUp &&
-                            !enableStripeTopUp;
+                            !enableStripeTopUp &&
+                            !enableWaffoTopUp;
                           if (shouldUseWeChatAmount && getWeChatAmount) {
                             await getWeChatAmount(value);
                             return;
@@ -284,7 +285,8 @@ const RechargeCard = ({
                           const shouldUseWeChatAmount =
                             enableWeChatTopUp &&
                             !enableOnlineTopUp &&
-                            !enableStripeTopUp;
+                            !enableStripeTopUp &&
+                            !enableWaffoTopUp;
                           if (shouldUseWeChatAmount && getWeChatAmount) {
                             getWeChatAmount(1);
                             return;
