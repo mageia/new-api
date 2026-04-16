@@ -24,6 +24,7 @@ import SettingsPaymentGateway from '../../pages/Setting/Payment/SettingsPaymentG
 import SettingsPaymentGatewayStripe from '../../pages/Setting/Payment/SettingsPaymentGatewayStripe';
 import SettingsPaymentGatewayCreem from '../../pages/Setting/Payment/SettingsPaymentGatewayCreem';
 import SettingsPaymentGatewayWaffo from '../../pages/Setting/Payment/SettingsPaymentGatewayWaffo';
+import SettingsPaymentGatewayWeChat from '../../pages/Setting/Payment/SettingsPaymentGatewayWeChat';
 import { API, showError, toBoolean } from '../../helpers';
 import { useTranslation } from 'react-i18next';
 
@@ -48,6 +49,19 @@ const PaymentSetting = () => {
     StripeUnitPrice: 8.0,
     StripeMinTopUp: 1,
     StripePromotionCodesEnabled: false,
+
+    WeChatPayEnabled: false,
+    WeChatPayMchID: '',
+    WeChatPayAppID: '',
+    WeChatPayAPIv3Key: '',
+    WeChatPayPrivateKey: '',
+    WeChatPayMerchantSerialNo: '',
+    WeChatPayPublicKeyID: '',
+    WeChatPayPublicKey: '',
+    WeChatPayUnitPrice: 1,
+    WeChatPayMinTopUp: 1,
+    WeChatPayNotifyUrl: '',
+    WeChatPayOrderDescription: '账户充值',
   });
 
   let [loading, setLoading] = useState(false);
@@ -96,6 +110,8 @@ const PaymentSetting = () => {
           case 'MinTopUp':
           case 'StripeUnitPrice':
           case 'StripeMinTopUp':
+          case 'WeChatPayUnitPrice':
+          case 'WeChatPayMinTopUp':
             newInputs[item.key] = parseFloat(item.value);
             break;
           default:
@@ -146,6 +162,9 @@ const PaymentSetting = () => {
         </Card>
         <Card style={{ marginTop: '10px' }}>
           <SettingsPaymentGatewayWaffo options={inputs} refresh={onRefresh} />
+        </Card>
+        <Card style={{ marginTop: '10px' }}>
+          <SettingsPaymentGatewayWeChat options={inputs} refresh={onRefresh} />
         </Card>
       </Spin>
     </>
