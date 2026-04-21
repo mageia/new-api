@@ -53,7 +53,7 @@ type responseTask struct {
 	RemixedFromVideoID string `json:"remixed_from_video_id,omitempty"`
 	Error              *struct {
 		Message string `json:"message"`
-		Code    string `json:"code"`
+		Code    any    `json:"code"`
 	} `json:"error,omitempty"`
 }
 
