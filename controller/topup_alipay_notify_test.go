@@ -34,15 +34,24 @@ func TestAlipayNotifyCompletesRechargeOnce(t *testing.T) {
 	}
 	defer func() { newAlipayClient = originalFactory }()
 
-	ctx, recorder := newAlipayNotifyContext(t, url.Values{
+	form := url.Values{
 		"out_trade_no": []string{"ALIPAY-TOPUP-1"},
 		"sign":         []string{"signed"},
-	})
+	}
+	ctx, recorder := newAlipayNotifyContext(t, form)
 	AlipayNotify(ctx)
 	if recorder.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", recorder.Code)
+		t.Fatalf("expected first status 200, got %d", recorder.Code)
 	}
+
+	ctx2, recorder2 := newAlipayNotifyContext(t, form)
+	AlipayNotify(ctx2)
+	if recorder2.Code != http.StatusOK {
+		t.Fatalf("expected repeated status 200, got %d", recorder2.Code)
+	}
+
 	assertTopupNotifyStatus(t, "ALIPAY-TOPUP-1", common.TopUpStatusSuccess)
+	assertTopupNotifyUserQuota(t, 1, int(10*common.QuotaPerUnit))
 }
 
 func TestAlipayNotifyRejectsAmountMismatch(t *testing.T) {
