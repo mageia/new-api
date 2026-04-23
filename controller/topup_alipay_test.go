@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 )
@@ -29,5 +31,32 @@ func TestGetTopUpInfoPrefersAlipayDirectOverLegacyAlipay(t *testing.T) {
 	}
 	if !strings.Contains(body, `"type":"alipay_direct"`) {
 		t.Fatalf("expected alipay_direct in response: %s", body)
+	}
+}
+
+func TestTopUpPersistsPaymentModeAndProviderPayload(t *testing.T) {
+	setupTopupControllerTestEnv(t)
+	seedTopupUser(t, 1, "default")
+
+	order := &model.TopUp{
+		UserId:          1,
+		Amount:          10,
+		Money:           7.2,
+		TradeNo:         "ALIPAY-TOPUP-1",
+		PaymentMethod:   "alipay_direct",
+		PaymentMode:     "qr",
+		ProviderPayload: `{"source":"query"}`,
+		Status:          common.TopUpStatusPending,
+	}
+	if err := model.DB.Create(order).Error; err != nil {
+		t.Fatalf("failed to create order: %v", err)
+	}
+
+	var saved model.TopUp
+	if err := model.DB.First(&saved, "trade_no = ?", order.TradeNo).Error; err != nil {
+		t.Fatalf("failed to query order: %v", err)
+	}
+	if saved.PaymentMode != "qr" || saved.ProviderPayload == "" {
+		t.Fatalf("unexpected saved order: %+v", saved)
 	}
 }
