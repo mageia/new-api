@@ -3540,6 +3540,19 @@
     "（当前仅支持易支付接口，默认使用上方服务器地址作为回调地址！）": "(Currently only supports Epay interface, the default callback address is the server address above!)",
     "，当前无生效订阅，将自动使用钱包": ", no active subscription. Wallet will be used automatically.",
     "，时间：": ",time:",
-    "，点击更新": ", click Update"
+    "，点击更新": ", click Update",
+    "支付宝官方直连设置": "Alipay Direct Settings",
+    "推荐先在沙箱环境验证 page 与 qr 两种模式，再切换正式环境。": "Validate page and QR modes in Alipay sandbox before switching to production.",
+    "启用支付宝官方直连": "Enable Alipay Direct",
+    "启用沙箱模式": "Enable Sandbox",
+    "支付宝 AppID": "Alipay AppID",
+    "应用私钥": "App Private Key",
+    "支付宝公钥": "Alipay Public Key",
+    "单价（元）": "Unit Price (CNY)",
+    "最小充值数量": "Minimum Top-up Quantity",
+    "异步通知地址": "Notify URL",
+    "充值回跳地址": "Top-up Return URL",
+    "订阅回跳地址": "Subscription Return URL",
+    "保存支付宝设置": "Save Alipay Settings"
   }
 }

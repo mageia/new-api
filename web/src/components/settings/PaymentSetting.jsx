@@ -25,6 +25,7 @@ import SettingsPaymentGatewayStripe from '../../pages/Setting/Payment/SettingsPa
 import SettingsPaymentGatewayCreem from '../../pages/Setting/Payment/SettingsPaymentGatewayCreem';
 import SettingsPaymentGatewayWaffo from '../../pages/Setting/Payment/SettingsPaymentGatewayWaffo';
 import SettingsPaymentGatewayWeChat from '../../pages/Setting/Payment/SettingsPaymentGatewayWeChat';
+import SettingsPaymentGatewayAlipay from '../../pages/Setting/Payment/SettingsPaymentGatewayAlipay';
 import { API, showError, toBoolean } from '../../helpers';
 import { useTranslation } from 'react-i18next';
 
@@ -62,6 +63,18 @@ const PaymentSetting = () => {
     WeChatPayMinTopUp: 1,
     WeChatPayNotifyUrl: '',
     WeChatPayOrderDescription: '',
+
+    AlipayEnabled: false,
+    AlipaySandbox: false,
+    AlipayAppID: '',
+    AlipayPrivateKey: '',
+    AlipayPublicKey: '',
+    AlipayUnitPrice: 1,
+    AlipayMinTopUp: 1,
+    AlipayNotifyURL: '',
+    AlipayReturnURL: '',
+    AlipaySubscriptionReturnURL: '',
+    AlipayOrderDescription: '',
   });
 
   let [loading, setLoading] = useState(false);
@@ -112,6 +125,8 @@ const PaymentSetting = () => {
           case 'StripeMinTopUp':
           case 'WeChatPayUnitPrice':
           case 'WeChatPayMinTopUp':
+          case 'AlipayUnitPrice':
+          case 'AlipayMinTopUp':
             newInputs[item.key] = parseFloat(item.value);
             break;
           default:
@@ -165,6 +180,9 @@ const PaymentSetting = () => {
         </Card>
         <Card style={{ marginTop: '10px' }}>
           <SettingsPaymentGatewayWeChat options={inputs} refresh={onRefresh} />
+        </Card>
+        <Card style={{ marginTop: '10px' }}>
+          <SettingsPaymentGatewayAlipay options={inputs} refresh={onRefresh} />
         </Card>
       </Spin>
     </>
