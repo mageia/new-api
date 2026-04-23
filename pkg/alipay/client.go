@@ -3,6 +3,7 @@ package alipay
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/shopspring/decimal"
@@ -12,6 +13,14 @@ import (
 const (
 	PayModePage = "page"
 	PayModeQR   = "qr"
+)
+
+const (
+	alipayProductCodePage         = "FAST_INSTANT_TRADE_PAY"
+	alipayProductCodePreCreate    = "FACE_TO_FACE_PAYMENT"
+	defaultAlipayOrderDescription = "账户充值"
+	alipayTradeStatusSuccess      = "TRADE_SUCCESS"
+	alipayTradeStatusFinished     = "TRADE_FINISHED"
 )
 
 type Config struct {
@@ -56,14 +65,14 @@ type NotificationResult struct {
 	TradeStatus    string
 	TotalAmount    decimal.Decimal
 	BuyerPayAmount decimal.Decimal
-	RawForm        string
+	RawForm        string // 支付宝回调表单的完整规范化查询串（url.Values.Encode），保留多值 key 语义
 }
 
 type Client interface {
 	CreatePageOrder(ctx context.Context, req CreateOrderRequest) (*PageOrderResponse, error)
 	CreateQROrder(ctx context.Context, req CreateOrderRequest) (*QROrderResponse, error)
 	QueryOrder(ctx context.Context, outTradeNo string) (*QueryOrderResult, error)
-	VerifyNotification(values map[string]string) (*NotificationResult, error)
+	VerifyNotification(values url.Values) (*NotificationResult, error)
 }
 
 type sdkClient struct {
@@ -106,17 +115,185 @@ func NewClient(cfg Config) (Client, error) {
 }
 
 func (c *sdkClient) CreatePageOrder(ctx context.Context, req CreateOrderRequest) (*PageOrderResponse, error) {
-	return nil, fmt.Errorf("create page order is not implemented")
+	if err := c.validateContext(ctx); err != nil {
+		return nil, err
+	}
+	if err := c.ensureReady(); err != nil {
+		return nil, err
+	}
+	resolvedReq, err := c.resolveCreateOrderRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	payURL, err := c.cli.TradePagePay(sdk.TradePagePay{
+		Trade: sdk.Trade{
+			Subject:     resolvedReq.Subject,
+			OutTradeNo:  resolvedReq.OutTradeNo,
+			TotalAmount: resolvedReq.TotalAmount.StringFixed(2),
+			ProductCode: alipayProductCodePage,
+			NotifyURL:   resolvedReq.NotifyURL,
+			ReturnURL:   resolvedReq.ReturnURL,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if payURL == nil {
+		return nil, fmt.Errorf("alipay trade page pay returned empty url")
+	}
+	return &PageOrderResponse{PayURL: payURL.String()}, nil
 }
 
 func (c *sdkClient) CreateQROrder(ctx context.Context, req CreateOrderRequest) (*QROrderResponse, error) {
-	return nil, fmt.Errorf("create qr order is not implemented")
+	if err := c.validateContext(ctx); err != nil {
+		return nil, err
+	}
+	if err := c.ensureReady(); err != nil {
+		return nil, err
+	}
+	resolvedReq, err := c.resolveCreateOrderRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := c.cli.TradePreCreate(ctx, sdk.TradePreCreate{
+		Trade: sdk.Trade{
+			Subject:     resolvedReq.Subject,
+			OutTradeNo:  resolvedReq.OutTradeNo,
+			TotalAmount: resolvedReq.TotalAmount.StringFixed(2),
+			ProductCode: alipayProductCodePreCreate,
+			NotifyURL:   resolvedReq.NotifyURL,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, fmt.Errorf("alipay trade precreate returned empty result")
+	}
+	if result.IsFailure() {
+		return nil, fmt.Errorf("alipay trade precreate failed: %s - %s", result.Code, result.SubMsg)
+	}
+	if strings.TrimSpace(result.QRCode) == "" {
+		return nil, fmt.Errorf("alipay trade precreate returned empty qr code")
+	}
+	return &QROrderResponse{
+		QRCode: result.QRCode,
+	}, nil
 }
 
 func (c *sdkClient) QueryOrder(ctx context.Context, outTradeNo string) (*QueryOrderResult, error) {
-	return nil, fmt.Errorf("query order is not implemented")
+	if err := c.validateContext(ctx); err != nil {
+		return nil, err
+	}
+	if err := c.ensureReady(); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(outTradeNo) == "" {
+		return nil, fmt.Errorf("alipay out_trade_no is required")
+	}
+
+	result, err := c.cli.TradeQuery(ctx, sdk.TradeQuery{OutTradeNo: strings.TrimSpace(outTradeNo)})
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, fmt.Errorf("alipay trade query returned empty result")
+	}
+	if result.IsFailure() {
+		return nil, fmt.Errorf("alipay trade query failed: %s - %s", result.Code, result.SubMsg)
+	}
+
+	totalAmount, err := parseDecimalOrZero(result.TotalAmount)
+	if err != nil {
+		return nil, fmt.Errorf("parse total_amount: %w", err)
+	}
+	buyerPayAmount, err := parseDecimalOrZero(result.BuyerPayAmount)
+	if err != nil {
+		return nil, fmt.Errorf("parse buyer_pay_amount: %w", err)
+	}
+
+	return &QueryOrderResult{
+		OutTradeNo:     result.OutTradeNo,
+		TradeNo:        result.TradeNo,
+		TradeStatus:    string(result.TradeStatus),
+		TotalAmount:    totalAmount,
+		BuyerPayAmount: buyerPayAmount,
+	}, nil
 }
 
-func (c *sdkClient) VerifyNotification(values map[string]string) (*NotificationResult, error) {
-	return nil, fmt.Errorf("verify notification is not implemented")
+func (c *sdkClient) VerifyNotification(values url.Values) (*NotificationResult, error) {
+	if err := c.ensureReady(); err != nil {
+		return nil, err
+	}
+	result, err := ParseNotification(values)
+	if err != nil {
+		return nil, err
+	}
+	if err = c.cli.VerifySign(context.Background(), values); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (c *sdkClient) validateContext(ctx context.Context) error {
+	if ctx == nil {
+		return fmt.Errorf("context is nil")
+	}
+	return nil
+}
+
+func (c *sdkClient) ensureReady() error {
+	if c == nil || c.cli == nil {
+		return fmt.Errorf("alipay client is not initialized")
+	}
+	return nil
+}
+
+func (c *sdkClient) resolveCreateOrderRequest(req CreateOrderRequest) (CreateOrderRequest, error) {
+	resolvedReq := req
+	resolvedReq.OutTradeNo = strings.TrimSpace(resolvedReq.OutTradeNo)
+	resolvedReq.Subject = strings.TrimSpace(resolvedReq.Subject)
+	resolvedReq.NotifyURL = strings.TrimSpace(resolvedReq.NotifyURL)
+	resolvedReq.ReturnURL = strings.TrimSpace(resolvedReq.ReturnURL)
+
+	if resolvedReq.OutTradeNo == "" {
+		return CreateOrderRequest{}, fmt.Errorf("alipay out_trade_no is required")
+	}
+	if !resolvedReq.TotalAmount.GreaterThan(decimal.Zero) {
+		return CreateOrderRequest{}, fmt.Errorf("alipay total amount must be greater than 0")
+	}
+
+	if resolvedReq.Subject == "" {
+		resolvedReq.Subject = strings.TrimSpace(c.cfg.DefaultOrderDescription)
+	}
+	if resolvedReq.Subject == "" {
+		resolvedReq.Subject = defaultAlipayOrderDescription
+	}
+	if resolvedReq.NotifyURL == "" {
+		resolvedReq.NotifyURL = strings.TrimSpace(c.cfg.DefaultNotifyURL)
+	}
+	if resolvedReq.ReturnURL == "" {
+		resolvedReq.ReturnURL = strings.TrimSpace(c.cfg.DefaultReturnURL)
+	}
+	return resolvedReq, nil
+}
+
+func parseDecimalOrZero(value string) (decimal.Decimal, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return decimal.Zero, nil
+	}
+	return decimal.NewFromString(value)
+}
+
+func (r NotificationResult) ValidatePaid() error {
+	if r.TradeStatus != alipayTradeStatusSuccess && r.TradeStatus != alipayTradeStatusFinished {
+		return fmt.Errorf("unexpected trade status: %s", r.TradeStatus)
+	}
+	if !r.TotalAmount.GreaterThan(decimal.Zero) {
+		return fmt.Errorf("invalid total amount")
+	}
+	return nil
 }
