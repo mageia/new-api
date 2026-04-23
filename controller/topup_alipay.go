@@ -51,6 +51,14 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
+func getAlipayMinTopup() int64 {
+	minTopup := decimal.NewFromInt(int64(setting.AlipayMinTopUp))
+	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
+		minTopup = minTopup.Mul(decimal.NewFromFloat(common.QuotaPerUnit))
+	}
+	return minTopup.IntPart()
+}
+
 func getAlipayPayMoney(amount int64, group string) (decimal.Decimal, int64) {
 	normalized := decimal.NewFromInt(amount)
 	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
@@ -82,8 +90,9 @@ func RequestAlipayAmount(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "管理员未开启支付宝支付"})
 		return
 	}
-	if req.Amount < int64(setting.AlipayMinTopUp) {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %d", setting.AlipayMinTopUp)})
+	minTopup := getAlipayMinTopup()
+	if req.Amount < minTopup {
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %d", minTopup)})
 		return
 	}
 	id := c.GetInt("id")
@@ -115,8 +124,9 @@ func RequestAlipayPay(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "管理员未开启支付宝支付"})
 		return
 	}
-	if req.Amount < int64(setting.AlipayMinTopUp) {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %d", setting.AlipayMinTopUp)})
+	minTopup := getAlipayMinTopup()
+	if req.Amount < minTopup {
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %d", minTopup)})
 		return
 	}
 	id := c.GetInt("id")
@@ -161,8 +171,6 @@ func RequestAlipayPay(c *gin.Context) {
 	if mode == alipaypkg.PayModePage {
 		pageResp, err := client.CreatePageOrder(c.Request.Context(), createReq)
 		if err != nil {
-			topUp.Status = common.TopUpStatusFailed
-			_ = topUp.Update()
 			c.JSON(http.StatusOK, gin.H{"message": "error", "data": "拉起支付失败"})
 			return
 		}
@@ -177,8 +185,6 @@ func RequestAlipayPay(c *gin.Context) {
 
 	qrResp, err := client.CreateQROrder(c.Request.Context(), createReq)
 	if err != nil {
-		topUp.Status = common.TopUpStatusFailed
-		_ = topUp.Update()
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "拉起支付失败"})
 		return
 	}

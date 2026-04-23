@@ -56,6 +56,7 @@ func GetTopUpInfo(c *gin.Context) {
 	// 获取支付方式
 	payMethods := clonePayMethods(operation_setting.PayMethods)
 	wechatMinTopup := getWeChatPayMinTopup()
+	alipayMinTopup := getAlipayMinTopup()
 	alipayConfigured := isAlipayConfigured()
 	if alipayConfigured {
 		filtered := make([]map[string]string, 0, len(payMethods))
@@ -75,7 +76,7 @@ func GetTopUpInfo(c *gin.Context) {
 				"name":      "支付宝",
 				"type":      "alipay_direct",
 				"color":     "rgba(var(--semi-blue-5), 1)",
-				"min_topup": strconv.Itoa(setting.AlipayMinTopUp),
+				"min_topup": strconv.FormatInt(alipayMinTopup, 10),
 			})
 		}
 	}
@@ -169,7 +170,7 @@ func GetTopUpInfo(c *gin.Context) {
 		"stripe_min_topup": setting.StripeMinTopUp,
 		"waffo_min_topup":  setting.WaffoMinTopUp,
 		"wechat_min_topup": wechatMinTopup,
-		"alipay_min_topup": setting.AlipayMinTopUp,
+		"alipay_min_topup": alipayMinTopup,
 		"amount_options":   operation_setting.GetPaymentSetting().AmountOptions,
 		"discount":         operation_setting.GetPaymentSetting().AmountDiscount,
 	}

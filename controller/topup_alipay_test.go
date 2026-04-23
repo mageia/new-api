@@ -430,3 +430,78 @@ func TestQueryAlipayPayMarksSuccessAfterTradeQuery(t *testing.T) {
 	}
 	assertTopupNotifyStatus(t, topUp.TradeNo, common.TopUpStatusSuccess)
 }
+
+func TestGetTopUpInfoReturnsScaledAlipayMinTopupInTokenMode(t *testing.T) {
+	setupTopupControllerTestEnv(t)
+	setupAlipaySettingIsolation(t)
+	seedAlipayConfig()
+	setting.AlipayMinTopUp = 2
+	operation_setting.GetGeneralSetting().QuotaDisplayType = operation_setting.QuotaDisplayTypeTokens
+
+	ctx, recorder := newTopupTestContext(t, http.MethodGet, "/api/user/topup/info", nil, 1)
+	GetTopUpInfo(ctx)
+
+	var response struct {
+		Success bool `json:"success"`
+		Data    struct {
+			AlipayMinTopUp int              `json:"alipay_min_topup"`
+			PayMethods     []map[string]any `json:"pay_methods"`
+		} `json:"data"`
+	}
+	if err := common.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if !response.Success {
+		t.Fatalf("expected success response, got body: %s", recorder.Body.String())
+	}
+	expectedMinTopup := int(common.QuotaPerUnit * 2)
+	if response.Data.AlipayMinTopUp != expectedMinTopup {
+		t.Fatalf("expected alipay_min_topup=%d, got %d", expectedMinTopup, response.Data.AlipayMinTopUp)
+	}
+	found := false
+	for _, method := range response.Data.PayMethods {
+		methodType, ok := method["type"].(string)
+		if !ok || methodType != "alipay_direct" {
+			continue
+		}
+		found = true
+		minTopup, ok := method["min_topup"].(string)
+		if !ok {
+			t.Fatalf("expected min_topup string in alipay_direct method, body: %s", recorder.Body.String())
+		}
+		if minTopup != fmt.Sprintf("%d", expectedMinTopup) {
+			t.Fatalf("expected alipay_direct min_topup=%d, got %s", expectedMinTopup, minTopup)
+		}
+	}
+	if !found {
+		t.Fatalf("expected alipay_direct in pay_methods, body: %s", recorder.Body.String())
+	}
+}
+
+func TestRequestAlipayPayKeepsPendingWhenCreatePageOrderFails(t *testing.T) {
+	setupTopupControllerTestEnv(t)
+	setupAlipaySettingIsolation(t)
+	seedTopupUser(t, 1, "default")
+	seedAlipayConfig()
+
+	originalFactory := newAlipayClient
+	newAlipayClient = func() (alipaypkg.Client, error) {
+		return fakeAlipayClient{
+			createPageOrderFunc: func(_ context.Context, _ alipaypkg.CreateOrderRequest) (*alipaypkg.PageOrderResponse, error) {
+				return nil, fmt.Errorf("upstream timeout")
+			},
+		}, nil
+	}
+	defer func() { newAlipayClient = originalFactory }()
+
+	ctx, recorder := newTopupTestContext(t, http.MethodPost, "/api/user/alipay/pay", map[string]any{
+		"amount":         10,
+		"payment_method": "alipay_direct",
+		"pay_mode":       "page",
+	}, 1)
+	RequestAlipayPay(ctx)
+	if !strings.Contains(recorder.Body.String(), "拉起支付失败") {
+		t.Fatalf("expected upstream error response, got: %s", recorder.Body.String())
+	}
+	assertTopupPending(t, "alipay_direct")
+}
