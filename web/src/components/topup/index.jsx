@@ -1070,6 +1070,7 @@ const TopUp = () => {
           enableStripeTopUp={enableStripeTopUp}
           enableWeChatTopUp={enableWeChatTopUp}
           enableAlipayTopUp={enableAlipayTopUp}
+          // 继续透传给订阅购买链路
           enableCreemTopUp={enableCreemTopUp}
           creemProducts={creemProducts}
           creemPreTopUp={creemPreTopUp}

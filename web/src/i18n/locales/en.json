@@ -3565,6 +3565,8 @@
     "等待支付中": "Waiting for payment",
     "支付成功": "Payment successful",
     "管理员未开启支付宝支付！": "Alipay is not enabled by the administrator!",
-    "支付宝（易支付）": "Alipay (EPay)"
+    "支付宝（易支付）": "Alipay (EPay)",
+    "订阅支付宝支付": "Subscription Alipay Payment",
+    "请选择套餐": "Please select a plan"
   }
 }

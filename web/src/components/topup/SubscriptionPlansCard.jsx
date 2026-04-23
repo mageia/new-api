@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Badge,
   Button,
@@ -30,10 +30,11 @@ import {
   Tooltip,
   Typography,
 } from '@douyinfe/semi-ui';
-import { API, showError, showSuccess, renderQuota } from '../../helpers';
+import { API, showError, showInfo, showSuccess, renderQuota } from '../../helpers';
 import { getCurrencyConfig } from '../../helpers/render';
 import { RefreshCw, Sparkles } from 'lucide-react';
 import SubscriptionPurchaseModal from './modals/SubscriptionPurchaseModal';
+import AlipayCheckoutModal from './modals/AlipayCheckoutModal';
 import {
   formatSubscriptionDuration,
   formatSubscriptionResetPeriod,
@@ -44,7 +45,7 @@ const { Text } = Typography;
 // 过滤易支付方式
 function getEpayMethods(payMethods = []) {
   return (payMethods || []).filter(
-    (m) => m?.type && m.type !== 'stripe' && m.type !== 'creem',
+    (m) => m?.type && m.type !== 'stripe' && m.type !== 'creem' && m.type !== 'alipay_direct',
   );
 }
 
@@ -77,6 +78,7 @@ const SubscriptionPlansCard = ({
   enableOnlineTopUp = false,
   enableStripeTopUp = false,
   enableCreemTopUp = false,
+  enableAlipayTopUp = false,
   billingPreference,
   onChangeBillingPreference,
   activeSubscriptions = [],
@@ -89,6 +91,10 @@ const SubscriptionPlansCard = ({
   const [paying, setPaying] = useState(false);
   const [selectedEpayMethod, setSelectedEpayMethod] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [alipayOpen, setAlipayOpen] = useState(false);
+  const [alipayPayData, setAlipayPayData] = useState({ tradeNo: '', qrCode: '', amount: '0.00', payMode: '' });
+  const [alipayCreating, setAlipayCreating] = useState(false);
+  const [alipayChecking, setAlipayChecking] = useState(false);
 
   const epayMethods = useMemo(() => getEpayMethods(payMethods), [payMethods]);
 
@@ -102,6 +108,8 @@ const SubscriptionPlansCard = ({
     setOpen(false);
     setSelectedPlan(null);
     setPaying(false);
+    setAlipayOpen(false);
+    setAlipayPayData({ tradeNo: '', qrCode: '', amount: '0.00', payMode: '' });
   };
 
   const handleRefresh = async () => {
@@ -198,6 +206,77 @@ const SubscriptionPlansCard = ({
     }
   };
 
+  const openAlipay = () => {
+    if (!selectedPlan?.plan) {
+      showError(t('请选择套餐'));
+      return;
+    }
+    setOpen(false);
+    setAlipayPayData({
+      tradeNo: '',
+      qrCode: '',
+      amount: Number(selectedPlan.plan.price_amount || 0).toFixed(2),
+      payMode: '',
+    });
+    setAlipayOpen(true);
+  };
+
+  const createSubscriptionAlipay = async (payMode) => {
+    setAlipayCreating(true);
+    try {
+      const res = await API.post('/api/subscription/alipay/pay', {
+        plan_id: selectedPlan.plan.id,
+        payment_method: 'alipay_direct',
+        pay_mode: payMode,
+      });
+      if (res.data?.success) {
+        const data = res.data.data || {};
+        setAlipayPayData({
+          tradeNo: data.trade_no || '',
+          qrCode: data.qr_code || '',
+          amount: data.amount_yuan || Number(selectedPlan.plan.price_amount || 0).toFixed(2),
+          payMode: data.pay_mode || payMode,
+        });
+        if (data.pay_url) {
+          window.open(data.pay_url, '_blank');
+          showSuccess(t('已打开支付页面'));
+        }
+      } else {
+        showError(res.data?.message || res.data?.data || t('支付失败'));
+      }
+    } catch (e) {
+      showError(t('支付请求失败'));
+    } finally {
+      setAlipayCreating(false);
+    }
+  };
+
+  const querySubscriptionAlipay = async (showPendingMessage = false) => {
+    if (!alipayPayData.tradeNo) return;
+    setAlipayChecking(true);
+    try {
+      const res = await API.post('/api/subscription/alipay/query', { trade_no: alipayPayData.tradeNo });
+      if (res.data?.success && res.data?.data?.status === 'success') {
+        showSuccess(t('支付成功'));
+        setAlipayOpen(false);
+        closeBuy();
+        await reloadSubscriptionSelf?.();
+        return;
+      }
+      if (res.data?.success && res.data?.data?.status === 'pending') {
+        if (showPendingMessage) {
+          showInfo(t('等待支付中'));
+        }
+        return;
+      }
+      showError(res.data?.message || res.data?.data || t('查单失败'));
+    } catch (e) {
+      showError(t('查单失败'));
+    } finally {
+      setAlipayChecking(false);
+    }
+  };
+
   // 当前订阅信息 - 支持多个订阅
   const hasActiveSubscription = activeSubscriptions.length > 0;
   const hasAnySubscription = allSubscriptions.length > 0;
@@ -250,6 +329,14 @@ const SubscriptionPlansCard = ({
     if (total <= 0) return 0;
     return Math.round((used / total) * 100);
   };
+
+  useEffect(() => {
+    if (!alipayOpen || !alipayPayData.tradeNo) return;
+    const timer = setInterval(() => {
+      querySubscriptionAlipay();
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [alipayOpen, alipayPayData.tradeNo]);
 
   const cardContent = (
     <>
@@ -673,6 +760,7 @@ const SubscriptionPlansCard = ({
         enableOnlineTopUp={enableOnlineTopUp}
         enableStripeTopUp={enableStripeTopUp}
         enableCreemTopUp={enableCreemTopUp}
+        enableAlipayTopUp={enableAlipayTopUp}
         purchaseLimitInfo={
           selectedPlan?.plan?.id
             ? {
@@ -684,6 +772,24 @@ const SubscriptionPlansCard = ({
         onPayStripe={payStripe}
         onPayCreem={payCreem}
         onPayEpay={payEpay}
+        onPayAlipay={openAlipay}
+      />
+
+      <AlipayCheckoutModal
+        visible={alipayOpen}
+        title={t('订阅支付宝支付')}
+        amount={alipayPayData.amount}
+        tradeNo={alipayPayData.tradeNo}
+        qrCode={alipayPayData.qrCode}
+        payMode={alipayPayData.payMode}
+        creating={alipayCreating}
+        checking={alipayChecking}
+        onClose={() => {
+          setAlipayOpen(false);
+          setOpen(true);
+        }}
+        onCreate={createSubscriptionAlipay}
+        onCheck={() => querySubscriptionAlipay(true)}
       />
     </>
   );
