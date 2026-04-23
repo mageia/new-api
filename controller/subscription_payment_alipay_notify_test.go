@@ -85,4 +85,15 @@ func TestSubscriptionAlipayNotifyCompletesOrderOnce(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("expected exactly one user subscription, got %d", count)
 	}
+
+	var topUp model.TopUp
+	if err := model.DB.First(&topUp, "trade_no = ?", "ALIPAY-SUB-1").Error; err != nil {
+		t.Fatalf("failed to query topup: %v", err)
+	}
+	if topUp.PaymentMode != "page" {
+		t.Fatalf("expected payment_mode page, got %s", topUp.PaymentMode)
+	}
+	if topUp.ProviderPayload == "" {
+		t.Fatal("expected provider_payload to be saved")
+	}
 }

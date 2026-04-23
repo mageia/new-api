@@ -523,6 +523,15 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string) error {
 			return ErrSubscriptionOrderNotFound
 		}
 		if order.Status == common.TopUpStatusSuccess {
+			if providerPayload != "" && order.ProviderPayload != providerPayload {
+				order.ProviderPayload = providerPayload
+				if err := upsertSubscriptionTopUpTx(tx, &order); err != nil {
+					return err
+				}
+				if err := tx.Save(&order).Error; err != nil {
+					return err
+				}
+			}
 			return nil
 		}
 		if order.Status != common.TopUpStatusPending {
