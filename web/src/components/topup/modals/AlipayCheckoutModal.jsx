@@ -21,7 +21,6 @@ import React, { useEffect, useState } from 'react';
 import { Button, Modal, Radio, Space, Typography } from '@douyinfe/semi-ui';
 import { QRCodeSVG } from 'qrcode.react';
 import { useTranslation } from 'react-i18next';
-import { getCurrencyConfig } from '../../../helpers/render';
 
 const { Text } = Typography;
 
@@ -38,10 +37,10 @@ export default function AlipayCheckoutModal({
   onClose,
   onCreate,
   onCheck,
+  currencySymbol = '¥',
 }) {
   const { t } = useTranslation();
   const [selectedMode, setSelectedMode] = useState(defaultMode);
-  const { symbol } = getCurrencyConfig();
 
   useEffect(() => {
     if (visible) {
@@ -75,7 +74,7 @@ export default function AlipayCheckoutModal({
                 <Radio value='qr'>{t('支付宝扫码支付')}</Radio>
               </Space>
             </Radio.Group>
-            <Text>{t('应付金额')}：{symbol}{amount}</Text>
+            <Text>{t('应付金额')}：{currencySymbol}{amount}</Text>
             <Button
               type='primary'
               loading={creating}
@@ -88,7 +87,7 @@ export default function AlipayCheckoutModal({
         {tradeNo && (
           <>
             <Text>{t('订单号')}：{tradeNo}</Text>
-            <Text>{t('应付金额')}：{symbol}{amount}</Text>
+            <Text>{t('应付金额')}：{currencySymbol}{amount}</Text>
             {showQRCode && <QRCodeSVG value={qrCode} size={220} />}
             <Text type='tertiary'>
               {payMode === 'page'
