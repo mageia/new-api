@@ -168,17 +168,19 @@ export default function SettingsPaymentGatewayAlipay(props) {
           </Row>
           <Row gutter={{ xs: 8, sm: 16, md: 24 }} style={{ marginTop: 16 }}>
             <Col xs={24} sm={24} md={12}>
-              <Form.Input
+              <Form.TextArea
                 field='AlipayPrivateKey'
-                type='password'
                 label={t('应用私钥')}
+                autosize
+                placeholder={t('敏感信息不显示，留空则不更新')}
               />
             </Col>
             <Col xs={24} sm={24} md={12}>
-              <Form.Input
+              <Form.TextArea
                 field='AlipayPublicKey'
-                type='password'
                 label={t('支付宝公钥')}
+                autosize
+                placeholder={t('敏感信息不显示，留空则不更新')}
               />
             </Col>
           </Row>

@@ -13,6 +13,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	alipaypkg "github.com/QuantumNous/new-api/pkg/alipay"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 )
@@ -198,5 +199,44 @@ func TestSubscriptionRequestAlipayPayRejectsDisabledAlipay(t *testing.T) {
 	SubscriptionRequestAlipayPay(ctx)
 	if !strings.Contains(recorder.Body.String(), "支付宝支付配置不完整") {
 		t.Fatalf("expected disabled alipay error, got: %s", recorder.Body.String())
+	}
+}
+
+func TestSubscriptionRequestAlipayPayConvertsUSDPlanPriceToCNY(t *testing.T) {
+	setupSubscriptionAlipayControllerTestEnv(t)
+	seedSubscriptionAlipayUser(t, 1)
+	plan := seedSubscriptionAlipayPlan(t, 10)
+	plan.Currency = "USD"
+	if err := model.DB.Save(plan).Error; err != nil {
+		t.Fatalf("failed to update plan currency: %v", err)
+	}
+	model.InvalidateSubscriptionPlanCache(plan.Id)
+	seedAlipayConfig()
+	expectedAmount := decimal.NewFromFloat(plan.PriceAmount).
+		Mul(decimal.NewFromFloat(operation_setting.USDExchangeRate)).
+		Round(2).
+		StringFixed(2)
+
+	originalFactory := newAlipayClient
+	newAlipayClient = func() (alipaypkg.Client, error) {
+		return fakeAlipayClient{
+			createQROrderFunc: func(_ context.Context, req alipaypkg.CreateOrderRequest) (*alipaypkg.QROrderResponse, error) {
+				if req.TotalAmount.StringFixed(2) != expectedAmount {
+					t.Fatalf("expected %s, got %s", expectedAmount, req.TotalAmount.StringFixed(2))
+				}
+				return &alipaypkg.QROrderResponse{QRCode: "https://qr.alipay.com/test"}, nil
+			},
+		}, nil
+	}
+	defer func() { newAlipayClient = originalFactory }()
+
+	ctx, recorder := newSubscriptionAlipayTestContext(t, http.MethodPost, "/api/subscription/alipay/pay", map[string]any{
+		"plan_id":        plan.Id,
+		"payment_method": "alipay_direct",
+		"pay_mode":       "qr",
+	}, 1)
+	SubscriptionRequestAlipayPay(ctx)
+	if !strings.Contains(recorder.Body.String(), expectedAmount) {
+		t.Fatalf("expected amount_yuan %s in response: %s", expectedAmount, recorder.Body.String())
 	}
 }

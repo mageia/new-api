@@ -42,6 +42,24 @@ import {
 
 const { Text } = Typography;
 
+
+function getAlipayCNYAmount(price, currency) {
+  const normalizedPrice = Number(price || 0);
+  if (!Number.isFinite(normalizedPrice)) return 0;
+  if ((currency || 'USD').toUpperCase() === 'CNY') {
+    return normalizedPrice;
+  }
+  const statusStr = localStorage.getItem('status');
+  let usdRate = 7;
+  try {
+    if (statusStr) {
+      const status = JSON.parse(statusStr);
+      usdRate = Number(status?.usd_exchange_rate) || 7;
+    }
+  } catch (e) {}
+  return normalizedPrice * usdRate;
+}
+
 // 过滤易支付方式
 function getEpayMethods(payMethods = []) {
   return (payMethods || []).filter(
@@ -215,7 +233,7 @@ const SubscriptionPlansCard = ({
     setAlipayPayData({
       tradeNo: '',
       qrCode: '',
-      amount: Number(selectedPlan.plan.price_amount || 0).toFixed(2),
+      amount: getAlipayCNYAmount(selectedPlan.plan.price_amount, selectedPlan.plan.currency).toFixed(2),
       payMode: '',
     });
     setAlipayOpen(true);
@@ -234,7 +252,7 @@ const SubscriptionPlansCard = ({
         setAlipayPayData({
           tradeNo: data.trade_no || '',
           qrCode: data.qr_code || '',
-          amount: data.amount_yuan || Number(selectedPlan.plan.price_amount || 0).toFixed(2),
+          amount: data.amount_yuan || getAlipayCNYAmount(selectedPlan.plan.price_amount, selectedPlan.plan.currency).toFixed(2),
           payMode: data.pay_mode || payMode,
         });
         if (data.pay_url) {
@@ -580,7 +598,8 @@ const SubscriptionPlansCard = ({
                 const { symbol, rate } = getCurrencyConfig();
                 const price = Number(plan?.price_amount || 0);
                 const convertedPrice = price * rate;
-                const displayPriceValue = enableAlipayTopUp ? price : convertedPrice;
+                const alipayCNYAmount = getAlipayCNYAmount(price, plan?.currency);
+                const displayPriceValue = enableAlipayTopUp ? alipayCNYAmount : convertedPrice;
                 const displaySymbol = enableAlipayTopUp ? '¥' : symbol;
                 const displayPrice = displayPriceValue.toFixed(
                   Number.isInteger(displayPriceValue) ? 0 : 2,

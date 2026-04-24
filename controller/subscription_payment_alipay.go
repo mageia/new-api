@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -9,6 +11,7 @@ import (
 	alipaypkg "github.com/QuantumNous/new-api/pkg/alipay"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 	"github.com/thanhpk/randstr"
@@ -22,6 +25,28 @@ type SubscriptionAlipayPayRequest struct {
 
 type SubscriptionAlipayQueryRequest struct {
 	TradeNo string `json:"trade_no"`
+}
+
+func resolveSubscriptionAlipayAmountYuan(plan *model.SubscriptionPlan) (decimal.Decimal, error) {
+	if plan == nil {
+		return decimal.Zero, fmt.Errorf("subscription plan is nil")
+	}
+	amount := decimal.NewFromFloat(plan.PriceAmount)
+	if !amount.GreaterThan(decimal.Zero) {
+		return decimal.Zero, fmt.Errorf("subscription price must be greater than 0")
+	}
+	switch strings.ToUpper(strings.TrimSpace(plan.Currency)) {
+	case "", "USD":
+		rate := operation_setting.USDExchangeRate
+		if rate <= 0 {
+			return decimal.Zero, fmt.Errorf("invalid usd exchange rate")
+		}
+		return amount.Mul(decimal.NewFromFloat(rate)).Round(2), nil
+	case "CNY":
+		return amount.Round(2), nil
+	default:
+		return decimal.Zero, fmt.Errorf("unsupported subscription currency: %s", plan.Currency)
+	}
 }
 
 func SubscriptionRequestAlipayPay(c *gin.Context) {
@@ -46,6 +71,11 @@ func SubscriptionRequestAlipayPay(c *gin.Context) {
 	}
 	if plan.PriceAmount < 0.01 {
 		common.ApiErrorMsg(c, "套餐金额过低")
+		return
+	}
+	amountYuan, err := resolveSubscriptionAlipayAmountYuan(plan)
+	if err != nil {
+		common.ApiErrorMsg(c, "套餐金额配置错误")
 		return
 	}
 	userId := c.GetInt("id")
@@ -73,7 +103,7 @@ func SubscriptionRequestAlipayPay(c *gin.Context) {
 	order := &model.SubscriptionOrder{
 		UserId:        userId,
 		PlanId:        plan.Id,
-		Money:         plan.PriceAmount,
+		Money:         amountYuan.InexactFloat64(),
 		TradeNo:       tradeNo,
 		PaymentMethod: paymentMethodAlipayDirect,
 		PaymentMode:   mode,
@@ -87,7 +117,7 @@ func SubscriptionRequestAlipayPay(c *gin.Context) {
 	createReq := alipaypkg.CreateOrderRequest{
 		OutTradeNo:  tradeNo,
 		Subject:     plan.Title,
-		TotalAmount: decimal.NewFromFloat(plan.PriceAmount).Round(2),
+		TotalAmount: amountYuan,
 		NotifyURL:   service.GetCallbackAddress() + "/api/subscription/alipay/notify",
 		ReturnURL:   firstNonEmpty(setting.AlipaySubscriptionReturnURL, service.GetCallbackAddress()+"/console/topup"),
 	}
