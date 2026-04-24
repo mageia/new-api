@@ -215,7 +215,7 @@ const TopUp = () => {
       }
 
       if (payment === 'alipay_direct') {
-        await getAlipayAmount();
+        const resolvedAmount = await getAlipayAmount();
         if (topUpCount < alipayMinTopUp) {
           showError(t('充值数量不能小于') + alipayMinTopUp);
           return;
@@ -223,7 +223,7 @@ const TopUp = () => {
         setAlipayPayData({
           tradeNo: '',
           qrCode: '',
-          amount: Number(amount || 0).toFixed(2),
+          amount: Number(resolvedAmount || 0).toFixed(2),
           payMode: '',
         });
         setAlipayPayOpen(true);
@@ -827,14 +827,17 @@ const TopUp = () => {
         amount: parseFloat(target),
       });
       if (res?.data?.success) {
-        setAmount(parseFloat(res.data.data));
-      } else {
-        setAmount(0);
-        showError(res?.data?.data || t('获取金额失败'));
+        const resolvedAmount = parseFloat(res.data.data);
+        setAmount(resolvedAmount);
+        return resolvedAmount;
       }
+      setAmount(0);
+      showError(res?.data?.data || t('获取金额失败'));
+      return 0;
     } catch (err) {
       setAmount(0);
       showError(t('获取金额失败'));
+      return 0;
     } finally {
       setAmountLoading(false);
     }

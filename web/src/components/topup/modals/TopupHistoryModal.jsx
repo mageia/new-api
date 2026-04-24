@@ -35,6 +35,7 @@ import {
 import { Coins } from 'lucide-react';
 import { IconSearch } from '@douyinfe/semi-icons';
 import { API, timestamp2string } from '../../../helpers';
+import { getCurrencyConfig } from '../../../helpers/render';
 import { isAdmin } from '../../../helpers/utils';
 import { useIsMobile } from '../../../hooks/common/useIsMobile';
 const { Text } = Typography;
@@ -66,6 +67,7 @@ const TopupHistoryModal = ({ visible, onCancel, t }) => {
   const [pageSize, setPageSize] = useState(10);
   const [keyword, setKeyword] = useState('');
   const isMobile = useIsMobile();
+  const { symbol } = getCurrencyConfig();
 
   const loadTopups = async (currentPage, currentPageSize) => {
     setLoading(true);
@@ -199,7 +201,7 @@ const TopupHistoryModal = ({ visible, onCancel, t }) => {
         title: t('支付金额'),
         dataIndex: 'money',
         key: 'money',
-        render: (money) => <Text type='danger'>¥{money.toFixed(2)}</Text>,
+        render: (money) => <Text type='danger'>{symbol}{money.toFixed(2)}</Text>,
       },
       {
         title: t('状态'),
