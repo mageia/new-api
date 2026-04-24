@@ -77,6 +77,7 @@ const SubscriptionPurchaseModal = ({
   const purchaseCount = Number(purchaseLimitInfo?.count || 0);
   const purchaseLimitReached =
     purchaseLimit > 0 && purchaseCount >= purchaseLimit;
+  const closeDisabled = paying;
 
   return (
     <Modal
@@ -87,10 +88,11 @@ const SubscriptionPurchaseModal = ({
         </div>
       }
       visible={visible}
-      onCancel={onCancel}
+      onCancel={closeDisabled ? undefined : onCancel}
       footer={null}
       size='small'
       centered
+      maskClosable={!closeDisabled}
     >
       {plan ? (
         <div className='space-y-4 pb-10'>
@@ -198,7 +200,7 @@ const SubscriptionPurchaseModal = ({
                       icon={<SiStripe size={14} color='#635BFF' />}
                       onClick={onPayStripe}
                       loading={paying}
-                      disabled={purchaseLimitReached}
+                      disabled={purchaseLimitReached || paying}
                     >
                       Stripe
                     </Button>
@@ -210,7 +212,7 @@ const SubscriptionPurchaseModal = ({
                       icon={<IconCreditCard />}
                       onClick={onPayCreem}
                       loading={paying}
-                      disabled={purchaseLimitReached}
+                      disabled={purchaseLimitReached || paying}
                     >
                       Creem
                     </Button>
@@ -222,7 +224,7 @@ const SubscriptionPurchaseModal = ({
                       icon={<SiAlipay size={14} color='#1677FF' />}
                       onClick={onPayAlipay}
                       loading={paying}
-                      disabled={purchaseLimitReached}
+                      disabled={purchaseLimitReached || paying}
                     >
                       {t('支付宝')}
                     </Button>
@@ -243,14 +245,14 @@ const SubscriptionPurchaseModal = ({
                       value: m.type,
                       label: m.name || m.type,
                     }))}
-                    disabled={purchaseLimitReached}
+                    disabled={purchaseLimitReached || paying}
                   />
                   <Button
                     theme='solid'
                     type='primary'
                     onClick={onPayEpay}
                     loading={paying}
-                    disabled={!selectedEpayMethod || purchaseLimitReached}
+                    disabled={!selectedEpayMethod || purchaseLimitReached || paying}
                   >
                     {t('支付')}
                   </Button>

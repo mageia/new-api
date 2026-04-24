@@ -51,6 +51,7 @@ export default function AlipayCheckoutModal({
 
   const showQRCode = visible && payMode === 'qr' && !!qrCode;
   const showManualCheck = visible && !!tradeNo;
+  const closeDisabled = creating || checking;
 
   return (
     <Modal
@@ -58,8 +59,8 @@ export default function AlipayCheckoutModal({
       title={title}
       footer={null}
       centered
-      maskClosable={false}
-      onCancel={onClose}
+      maskClosable={!closeDisabled}
+      onCancel={closeDisabled ? undefined : onClose}
     >
       <div className='flex flex-col gap-3'>
         {!tradeNo && (
@@ -99,7 +100,7 @@ export default function AlipayCheckoutModal({
                 {t('我已完成支付，检查状态')}
               </Button>
             )}
-            <Button onClick={onClose}>{t('关闭')}</Button>
+            <Button onClick={onClose} disabled={closeDisabled}>{t('关闭')}</Button>
           </>
         )}
       </div>
