@@ -21,6 +21,7 @@ import (
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/shopspring/decimal"
 )
 
 const (
@@ -179,6 +180,10 @@ func ResolveWaffoPancakeTradeNo(event *waffoPancakeWebhookEvent) (string, error)
 		if err == nil {
 			return mappedTopUp.TradeNo, nil
 		}
+		inferredTopUp, err := findWaffoPancakePendingTopUpByWebhookDetails(event)
+		if err == nil {
+			return inferredTopUp.TradeNo, nil
+		}
 		return "", fmt.Errorf("waffo pancake order not found for webhook orderId=%s", tradeNo)
 	}
 
@@ -209,6 +214,67 @@ func findWaffoPancakeTopUpByProviderOrderID(providerOrderID string) (*model.TopU
 	}
 
 	return nil, fmt.Errorf("waffo pancake provider order not mapped")
+}
+
+func findWaffoPancakePendingTopUpByWebhookDetails(event *waffoPancakeWebhookEvent) (*model.TopUp, error) {
+	userID, err := inferWaffoPancakeUserIDFromBuyerEmail(event.Data.BuyerEmail)
+	if err != nil {
+		return nil, err
+	}
+
+	amount, err := inferWaffoPancakePaymentAmount(string(event.Data.Amount))
+	if err != nil {
+		return nil, err
+	}
+
+	cutoff := time.Now().Add(-2 * time.Hour).Unix()
+	var candidates []model.TopUp
+	err = model.DB.
+		Where(
+			"user_id = ? AND payment_method = ? AND status = ? AND create_time >= ?",
+			userID,
+			model.PaymentMethodWaffoPancake,
+			common.TopUpStatusPending,
+			cutoff,
+		).
+		Order("id desc").
+		Limit(10).
+		Find(&candidates).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range candidates {
+		if decimal.NewFromFloat(candidates[i].Money).Round(2).Equal(amount) {
+			return &candidates[i], nil
+		}
+	}
+
+	return nil, fmt.Errorf("waffo pancake pending order not inferred")
+}
+
+func inferWaffoPancakeUserIDFromBuyerEmail(buyerEmail string) (int, error) {
+	localPart, _, found := strings.Cut(strings.TrimSpace(buyerEmail), "@")
+	if !found || localPart == "" {
+		return 0, fmt.Errorf("missing buyer email user id")
+	}
+
+	userID, err := strconv.Atoi(localPart)
+	if err != nil || userID <= 0 {
+		return 0, fmt.Errorf("invalid buyer email user id")
+	}
+	return userID, nil
+}
+
+func inferWaffoPancakePaymentAmount(rawAmount string) (decimal.Decimal, error) {
+	amount, err := decimal.NewFromString(strings.TrimSpace(rawAmount))
+	if err != nil {
+		return decimal.Zero, err
+	}
+	if !amount.IsPositive() {
+		return decimal.Zero, fmt.Errorf("invalid webhook amount")
+	}
+	return amount.Round(2), nil
 }
 
 func normalizeRSAPrivateKey(raw string) (string, error) {
