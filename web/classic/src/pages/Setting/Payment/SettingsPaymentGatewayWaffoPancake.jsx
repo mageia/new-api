@@ -28,7 +28,10 @@ import {
 import { useTranslation } from 'react-i18next';
 import { BookOpen } from 'lucide-react';
 
+const toBoolean = (value) => value === true || value === 'true';
+
 const defaultInputs = {
+  WaffoPancakeEnabled: false,
   WaffoPancakeMerchantID: '',
   WaffoPancakePrivateKey: '',
   WaffoPancakeReturnURL: '',
@@ -47,6 +50,7 @@ export default function SettingsPaymentGatewayWaffoPancake(props) {
     if (!props.options || !formApiRef.current) return;
 
     const currentInputs = {
+      WaffoPancakeEnabled: toBoolean(props.options.WaffoPancakeEnabled),
       WaffoPancakeMerchantID: props.options.WaffoPancakeMerchantID || '',
       WaffoPancakePrivateKey: props.options.WaffoPancakePrivateKey || '',
       WaffoPancakeReturnURL: props.options.WaffoPancakeReturnURL || '',
@@ -74,6 +78,10 @@ export default function SettingsPaymentGatewayWaffoPancake(props) {
       // because picking entities from a live catalog needs the Select +
       // dependent-dropdown UX that the classic Semi-UI page doesn't have.
       const options = [
+        {
+          key: 'WaffoPancakeEnabled',
+          value: values.WaffoPancakeEnabled ? 'true' : 'false',
+        },
         {
           key: 'WaffoPancakeMerchantID',
           value: values.WaffoPancakeMerchantID || '',
@@ -160,14 +168,20 @@ export default function SettingsPaymentGatewayWaffoPancake(props) {
             gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
             style={{ marginTop: 16 }}
           >
-            <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+            <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+              <Form.Switch
+                field='WaffoPancakeEnabled'
+                label={t('启用 Waffo Pancake')}
+              />
+            </Col>
+            <Col xs={24} sm={24} md={8} lg={8} xl={8}>
               <Form.Input
                 field='WaffoPancakeMerchantID'
                 label={t('商户 ID')}
                 placeholder={t('例如：MER_xxx')}
               />
             </Col>
-            <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+            <Col xs={24} sm={24} md={8} lg={8} xl={8}>
               <Form.Input
                 field='WaffoPancakeReturnURL'
                 label={t('支付返回地址')}

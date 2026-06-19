@@ -114,18 +114,20 @@ func TestWaffoWebhookEnabledRequiresTopUpAndWebhookConfig(t *testing.T) {
 
 func TestWaffoPancakeWebhookEnabledRequiresTopUpAndWebhookConfig(t *testing.T) {
 	confirmPaymentComplianceForTest(t)
+	originalEnabled := setting.WaffoPancakeEnabled
 	originalMerchantID := setting.WaffoPancakeMerchantID
 	originalPrivateKey := setting.WaffoPancakePrivateKey
 	originalProductID := setting.WaffoPancakeProductID
 	t.Cleanup(func() {
+		setting.WaffoPancakeEnabled = originalEnabled
 		setting.WaffoPancakeMerchantID = originalMerchantID
 		setting.WaffoPancakePrivateKey = originalPrivateKey
 		setting.WaffoPancakeProductID = originalProductID
 	})
 
-	// Presence of all three credentials enables the gateway. Webhook public
-	// keys are bundled in the SDK and there is no separate Enabled toggle —
-	// clear any of the three fields to disable.
+	// Gateway requires the explicit admin toggle and all three credentials.
+	// Webhook public keys are bundled in the SDK.
+	setting.WaffoPancakeEnabled = true
 	setting.WaffoPancakeMerchantID = ""
 	setting.WaffoPancakePrivateKey = "private"
 	setting.WaffoPancakeProductID = "product"
@@ -133,6 +135,10 @@ func TestWaffoPancakeWebhookEnabledRequiresTopUpAndWebhookConfig(t *testing.T) {
 
 	setting.WaffoPancakeMerchantID = "merchant"
 	require.True(t, isWaffoPancakeWebhookEnabled())
+
+	setting.WaffoPancakeEnabled = false
+	require.False(t, isWaffoPancakeWebhookEnabled())
+	setting.WaffoPancakeEnabled = true
 
 	setting.WaffoPancakeProductID = ""
 	require.False(t, isWaffoPancakeWebhookEnabled())
