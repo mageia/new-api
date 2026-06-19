@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/pkg/wechatpay"
 	"github.com/QuantumNous/new-api/service"
@@ -153,8 +154,15 @@ func RequestWeChatPay(c *gin.Context) {
 		return
 	}
 
+	notifyURL := setting.WeChatPayNotifyUrl
+	if notifyURL == "" {
+		notifyURL = service.GetCallbackAddress() + "/api/wechat/notify"
+	}
+	clientIP := c.ClientIP()
+
 	client, err := newWeChatPayClient()
 	if err != nil {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("微信支付 SDK 初始化失败 user_id=%d mch_id=%s app_id=%s merchant_serial_no=%s public_key_id=%s notify_url=%q error=%q", id, setting.WeChatPayMchID, setting.WeChatPayAppID, setting.WeChatPayMerchantSerialNo, setting.WeChatPayPublicKeyID, notifyURL, err.Error()))
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "支付配置错误"})
 		return
 	}
@@ -171,6 +179,7 @@ func RequestWeChatPay(c *gin.Context) {
 		Status:          common.TopUpStatusPending,
 	}
 	if err = topUp.Insert(); err != nil {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("微信支付 创建充值订单失败 user_id=%d trade_no=%s amount=%d error=%q", id, tradeNo, req.Amount, err.Error()))
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "创建订单失败"})
 		return
 	}
@@ -178,9 +187,10 @@ func RequestWeChatPay(c *gin.Context) {
 	resp, err := client.CreateNativeOrder(c.Request.Context(), wechatpay.NativeOrderRequest{
 		OutTradeNo: tradeNo,
 		AmountFen:  fen,
-		ClientIP:   c.ClientIP(),
+		ClientIP:   clientIP,
 	})
 	if err != nil {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("微信支付 拉起支付失败 user_id=%d trade_no=%s amount=%d money=%s fen=%d mch_id=%s app_id=%s merchant_serial_no=%s public_key_id=%s notify_url=%q client_ip=%q error=%q", id, tradeNo, req.Amount, yuan.String(), fen, setting.WeChatPayMchID, setting.WeChatPayAppID, setting.WeChatPayMerchantSerialNo, setting.WeChatPayPublicKeyID, notifyURL, clientIP, err.Error()))
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "拉起支付失败"})
 		return
 	}
