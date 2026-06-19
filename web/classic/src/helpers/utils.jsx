@@ -748,8 +748,13 @@ export const calculateModelPrice = ({
   }
 
   if (record.quota_type === 1) {
-    // 按次计费
-    const priceUSD = parseFloat(record.model_price) * usedGroupRatio;
+    // 按次计费：model_price 存储的是内部额度/积分，展示前需先按 QuotaPerUnit 换算为 USD，
+    // 再由 displayPrice 根据站点货币配置转换为 USD/CNY/自定义货币。
+    const quotaPerUnit = parseFloat(localStorage.getItem('quota_per_unit') || '1');
+    const quotaPerUnitSafe =
+      Number.isFinite(quotaPerUnit) && quotaPerUnit > 0 ? quotaPerUnit : 1;
+    const priceUSD =
+      (parseFloat(record.model_price) * usedGroupRatio) / quotaPerUnitSafe;
     const displayVal = displayPrice(priceUSD);
 
     return {

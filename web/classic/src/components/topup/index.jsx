@@ -78,6 +78,12 @@ const TopUp = () => {
   const [enableStripeTopUp, setEnableStripeTopUp] = useState(
     statusState?.status?.enable_stripe_topup || false,
   );
+  const [enableAlipayTopUp, setEnableAlipayTopUp] = useState(
+    statusState?.status?.enable_alipay_topup || false,
+  );
+  const [enableWeChatTopUp, setEnableWeChatTopUp] = useState(
+    statusState?.status?.enable_wechat_topup || false,
+  );
   const [statusLoading, setStatusLoading] = useState(true);
 
   // Creem 相关状态
@@ -217,6 +223,16 @@ const TopUp = () => {
     } else if (payment === 'waffo_pancake') {
       if (!enableWaffoPancakeTopUp) {
         showError(t('管理员未开启 Waffo Pancake 充值！'));
+        return;
+      }
+    } else if (payment === 'alipay_direct') {
+      if (!enableAlipayTopUp) {
+        showError(t('管理员未开启支付宝充值！'));
+        return;
+      }
+    } else if (payment === 'wechat_pay') {
+      if (!enableWeChatTopUp) {
+        showError(t('管理员未开启微信支付充值！'));
         return;
       }
     } else if (payment.startsWith('waffo:')) {
@@ -634,9 +650,9 @@ const TopUp = () => {
               }
 
               if (!method.color) {
-                if (method.type === 'alipay') {
+                if (method.type === 'alipay' || method.type === 'alipay_direct') {
                   method.color = 'rgba(var(--semi-blue-5), 1)';
-                } else if (method.type === 'wxpay') {
+                } else if (method.type === 'wxpay' || method.type === 'wechat_pay') {
                   method.color = 'rgba(var(--semi-green-5), 1)';
                 } else if (method.type === 'stripe') {
                   method.color = 'rgba(var(--semi-purple-5), 1)';
@@ -655,6 +671,8 @@ const TopUp = () => {
 
           setPayMethods(payMethods);
           const enableStripeTopUp = data.enable_stripe_topup || false;
+          const enableAlipayTopUp = data.enable_alipay_topup || false;
+          const enableWeChatTopUp = data.enable_wechat_topup || false;
           const enableOnlineTopUp = data.enable_online_topup || false;
           const enableCreemTopUp = data.enable_creem_topup || false;
           const enableWaffoTopUp = data.enable_waffo_topup || false;
@@ -664,13 +682,19 @@ const TopUp = () => {
             ? data.min_topup
             : enableStripeTopUp
               ? data.stripe_min_topup
-              : enableWaffoTopUp
-                ? data.waffo_min_topup
-                : enableWaffoPancakeTopUp
-                  ? data.waffo_pancake_min_topup
-                  : 1;
+              : enableAlipayTopUp
+                ? data.alipay_min_topup
+                : enableWeChatTopUp
+                  ? data.wechat_min_topup
+                  : enableWaffoTopUp
+                  ? data.waffo_min_topup
+                  : enableWaffoPancakeTopUp
+                    ? data.waffo_pancake_min_topup
+                    : 1;
           setEnableOnlineTopUp(enableOnlineTopUp);
           setEnableStripeTopUp(enableStripeTopUp);
+          setEnableAlipayTopUp(enableAlipayTopUp);
+          setEnableWeChatTopUp(enableWeChatTopUp);
           setEnableCreemTopUp(enableCreemTopUp);
           setEnableWaffoTopUp(enableWaffoTopUp);
           setWaffoPayMethods(data.waffo_pay_methods || []);
@@ -980,6 +1004,8 @@ const TopUp = () => {
           creemPreTopUp={creemPreTopUp}
           enableWaffoTopUp={enableWaffoTopUp}
           enableWaffoPancakeTopUp={enableWaffoPancakeTopUp}
+          enableAlipayTopUp={enableAlipayTopUp}
+          enableWeChatTopUp={enableWeChatTopUp}
           presetAmounts={presetAmounts}
           selectedPreset={selectedPreset}
           selectPresetAmount={selectPresetAmount}

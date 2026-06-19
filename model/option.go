@@ -304,7 +304,12 @@ func updateOptionMap(key string, value string) (err error) {
 			common.ImageDownloadPermission = intValue
 		}
 	}
-	if strings.HasSuffix(key, "Enabled") || key == "DefaultCollapseSidebar" || key == "DefaultUseAutoGroup" || key == "SMTPForceAuthLogin" {
+	if key == "DisplayInCurrencyEnabled" {
+		// Compatibility only: the legacy switch should not override the newer
+		// general_setting.quota_display_type option (USD/CNY/TOKENS/CUSTOM).
+		common.DisplayInCurrencyEnabled = value == "true"
+	}
+	if (strings.HasSuffix(key, "Enabled") && key != "DisplayInCurrencyEnabled") || key == "DefaultCollapseSidebar" || key == "DefaultUseAutoGroup" || key == "SMTPForceAuthLogin" {
 		boolValue := value == "true"
 		switch key {
 		case "PasswordRegisterEnabled":
@@ -335,16 +340,6 @@ func updateOptionMap(key string, value string) (err error) {
 			common.AutomaticEnableChannelEnabled = boolValue
 		case "LogConsumeEnabled":
 			common.LogConsumeEnabled = boolValue
-		case "DisplayInCurrencyEnabled":
-			// 兼容旧字段：同步到新配置 general_setting.quota_display_type（运行时生效）
-			// true -> USD, false -> TOKENS
-			newVal := "USD"
-			if !boolValue {
-				newVal = "TOKENS"
-			}
-			if cfg := config.GlobalConfig.Get("general_setting"); cfg != nil {
-				_ = config.UpdateConfigFromMap(cfg, map[string]string{"quota_display_type": newVal})
-			}
 		case "DisplayTokenStatEnabled":
 			common.DisplayTokenStatEnabled = boolValue
 		case "DrawingEnabled":

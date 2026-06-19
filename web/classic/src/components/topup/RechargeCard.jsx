@@ -90,6 +90,8 @@ const RechargeCard = ({
   onOpenHistory,
   enableWaffoTopUp,
   enableWaffoPancakeTopUp,
+  enableAlipayTopUp = false,
+  enableWeChatTopUp = false,
   subscriptionLoading = false,
   subscriptionPlans = [],
   billingPreference,
@@ -234,7 +236,9 @@ const RechargeCard = ({
           enableStripeTopUp ||
           enableCreemTopUp ||
           enableWaffoTopUp ||
-          enableWaffoPancakeTopUp ? (
+          enableWaffoPancakeTopUp ||
+          enableAlipayTopUp ||
+          enableWeChatTopUp ? (
           <Form
             getFormApi={(api) => (onlineFormApiRef.current = api)}
             initValues={{ topUpCount: topUpCount }}
@@ -243,7 +247,9 @@ const RechargeCard = ({
               {(enableOnlineTopUp ||
                 enableStripeTopUp ||
                 enableWaffoTopUp ||
-                enableWaffoPancakeTopUp) && (
+                enableWaffoPancakeTopUp ||
+                enableAlipayTopUp ||
+                enableWeChatTopUp) && (
                 <Row gutter={12}>
                   <Col xs={24} sm={24} md={24} lg={10} xl={10}>
                     <Form.InputNumber
@@ -253,7 +259,9 @@ const RechargeCard = ({
                         !enableOnlineTopUp &&
                         !enableStripeTopUp &&
                         !enableWaffoTopUp &&
-                        !enableWaffoPancakeTopUp
+                        !enableWaffoPancakeTopUp &&
+                        !enableAlipayTopUp &&
+                        !enableWeChatTopUp
                       }
                       placeholder={
                         t('充值数量，最低 ') + renderQuotaWithAmount(minTopUp)
@@ -319,14 +327,22 @@ const RechargeCard = ({
                               payMethod.type.startsWith('waffo:');
                             const isWaffoPancake =
                               payMethod.type === 'waffo_pancake';
+                            const isAlipayDirect =
+                              payMethod.type === 'alipay_direct';
+                            const isWeChatDirect =
+                              payMethod.type === 'wechat_pay';
                             const disabled =
                               (!enableOnlineTopUp &&
                                 !isStripe &&
                                 !isWaffo &&
-                                !isWaffoPancake) ||
+                                !isWaffoPancake &&
+                                !isAlipayDirect &&
+                                !isWeChatDirect) ||
                               (!enableStripeTopUp && isStripe) ||
                               (!enableWaffoTopUp && isWaffo) ||
                               (!enableWaffoPancakeTopUp && isWaffoPancake) ||
+                              (!enableAlipayTopUp && isAlipayDirect) ||
+                              (!enableWeChatTopUp && isWeChatDirect) ||
                               minTopupVal > Number(topUpCount || 0);
 
                             const buttonEl = (
@@ -340,11 +356,16 @@ const RechargeCard = ({
                                   paymentLoading && payWay === payMethod.type
                                 }
                                 icon={
-                                  payMethod.type === 'alipay' ? (
+                                  payMethod.type === 'alipay' ||
+                                  payMethod.type === 'alipay_direct' ||
+                                  payMethod.icon === 'SiAlipay' ? (
                                     <SiAlipay size={18} color='#1677FF' />
-                                  ) : payMethod.type === 'wxpay' ? (
+                                  ) : payMethod.type === 'wxpay' ||
+                                    payMethod.type === 'wechat_pay' ||
+                                    payMethod.icon === 'SiWechat' ? (
                                     <SiWechat size={18} color='#07C160' />
-                                  ) : payMethod.type === 'stripe' ? (
+                                  ) : payMethod.type === 'stripe' ||
+                                    payMethod.icon === 'SiStripe' ? (
                                     <SiStripe size={18} color='#635BFF' />
                                   ) : payMethod.icon ? (
                                     <img
@@ -411,7 +432,11 @@ const RechargeCard = ({
                 </Row>
               )}
 
-              {(enableOnlineTopUp || enableStripeTopUp || enableWaffoTopUp) && (
+              {(enableOnlineTopUp ||
+                enableStripeTopUp ||
+                enableWaffoTopUp ||
+                enableAlipayTopUp ||
+                enableWeChatTopUp) && (
                 <Form.Slot
                   label={
                     <div className='flex items-center gap-2'>

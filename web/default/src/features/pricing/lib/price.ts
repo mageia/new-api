@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { formatCurrencyFromUSD } from '@/lib/currency'
+import { formatCurrencyFromUSD, getCurrencyDisplay } from '@/lib/currency'
 import { QUOTA_TYPE_VALUES, TOKEN_UNIT_DIVISORS } from '../constants'
 import type { PricingModel, TokenUnit, PriceType } from '../types'
 
@@ -245,7 +245,8 @@ export function formatFixedPrice(
   }
 
   const ratio = groupRatio[group] || 1
-  let priceInUSD = (model.model_price || 0) * ratio
+  const { config } = getCurrencyDisplay()
+  let priceInUSD = ((model.model_price || 0) * ratio) / config.quotaPerUnit
 
   priceInUSD = applyRechargeRate(
     priceInUSD,
@@ -280,7 +281,8 @@ export function formatRequestPrice(
   const groupRatio = model.group_ratio || {}
   const minRatio = getMinGroupRatio(enableGroups, groupRatio)
 
-  let priceInUSD = (model.model_price || 0) * minRatio
+  const { config } = getCurrencyDisplay()
+  let priceInUSD = ((model.model_price || 0) * minRatio) / config.quotaPerUnit
 
   priceInUSD = applyRechargeRate(
     priceInUSD,
