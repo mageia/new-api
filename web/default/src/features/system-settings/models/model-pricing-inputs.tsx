@@ -18,7 +18,6 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
-import { getPricingUnitAffixes } from './model-pricing-core'
 import {
   InputGroup,
   InputGroupAddon,
@@ -35,11 +34,9 @@ export function PriceInput(props: {
   disabled?: boolean
   onChange: (value: string) => void
 }) {
-  const { prefix, suffix } = getPricingUnitAffixes()
-
   return (
     <InputGroup>
-      {prefix && <InputGroupAddon>{prefix}</InputGroupAddon>}
+      <InputGroupAddon>$</InputGroupAddon>
       <InputGroupInput
         inputMode='decimal'
         value={props.value}
@@ -47,7 +44,7 @@ export function PriceInput(props: {
         disabled={props.disabled}
         onChange={(event) => props.onChange(event.target.value)}
       />
-      <InputGroupAddon align='inline-end'>{suffix}</InputGroupAddon>
+      <InputGroupAddon align='inline-end'>$/1M</InputGroupAddon>
     </InputGroup>
   )
 }
@@ -86,7 +83,7 @@ export function PriceLane(props: {
       />
       <p className='text-muted-foreground text-xs'>
         {props.enabled
-          ? t('Price per 1M tokens in the configured display unit.')
+          ? t('USD price per 1M tokens.')
           : t('Disabled lanes are omitted on save.')}
       </p>
     </SettingsControlGroup>

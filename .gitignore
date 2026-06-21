@@ -46,3 +46,7 @@ scripts/test_nano_banana_images.sh
 scripts/test_video_generation.sh
 waninter_api_doc.xml
 
+
+# Local generated pricing/export artifacts
+docs/pricing.json
+scripts/

@@ -72,9 +72,6 @@ import {
   numericDraftRegex,
   ratioFieldByLane,
   toNumberOrNull,
-  displayPriceToRatio,
-  displayAmountToSystemPrice,
-  getPricingUnitAffixes,
   type LaneKey,
   type ModelPricingFormValues,
   type ModelRatioData,
@@ -179,7 +176,7 @@ export const ModelPricingEditorPanel = forwardRef<
     if (editData) {
       form.reset({
         name: editData.name,
-        price: displayAmountToSystemPrice(editData.price) || '',
+        price: editData.price || '',
         ratio: editData.ratio || '',
         cacheRatio: editData.cacheRatio || '',
         createCacheRatio: editData.createCacheRatio || '',
@@ -254,7 +251,7 @@ export const ModelPricingEditorPanel = forwardRef<
     const inputPrice = toNumberOrNull(nextPromptPrice)
     setFormValue(
       'ratio',
-      inputPrice !== null ? displayPriceToRatio(inputPrice) : ''
+      inputPrice !== null ? formatPricingNumber(inputPrice / 2) : ''
     )
 
     laneConfigs.forEach(({ key }) => {
@@ -442,10 +439,7 @@ export const ModelPricingEditorPanel = forwardRef<
       const data: ModelRatioData = {
         name: values.name.trim(),
         billingMode: pricingMode,
-        price:
-          pricingMode === 'per-request'
-            ? displayAmountToSystemPrice(values.price)
-            : values.price || '',
+        price: values.price || '',
         ratio: values.ratio || '',
         cacheRatio: values.cacheRatio || '',
         createCacheRatio: values.createCacheRatio || '',
@@ -611,11 +605,7 @@ export const ModelPricingEditorPanel = forwardRef<
                               <FieldLabel>{t('Fixed price')}</FieldLabel>
                               <FormControl>
                                 <InputGroup>
-                                  {getPricingUnitAffixes().prefix && (
-                                    <InputGroupAddon>
-                                      {getPricingUnitAffixes().prefix}
-                                    </InputGroupAddon>
-                                  )}
+                                  <InputGroupAddon>$</InputGroupAddon>
                                   <InputGroupInput
                                     inputMode='decimal'
                                     placeholder='0.01'
@@ -634,7 +624,7 @@ export const ModelPricingEditorPanel = forwardRef<
                               </FormControl>
                               <FieldDescription>
                                 {t(
-                                  'Cost per request in the configured display unit, regardless of tokens used.'
+                                  'Cost in USD per request, regardless of tokens used.'
                                 )}
                               </FieldDescription>
                               <FormMessage />

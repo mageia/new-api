@@ -19,11 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 import { splitBillingExprAndRequestRules } from '@/features/pricing/lib/billing-expr'
 import { safeJsonParse } from '../utils/json-parser'
 import { formatPricingNumber } from './pricing-format'
-import {
-  getPricingUnitAffixes,
-  ratioToDisplayPrice,
-  systemPriceToDisplayAmount,
-} from './model-pricing-core'
 
 export type ModelPricingSnapshotInput = {
   modelPrice: string
@@ -72,15 +67,11 @@ const toNumberOrNull = (value?: string) => {
 }
 
 const ratioToPrice = (ratio?: string, denominator?: string) => {
-  if (!denominator) return ratioToDisplayPrice(ratio)
   const ratioNumber = toNumberOrNull(ratio)
-  const denominatorNumber = toNumberOrNull(denominator)
+  const denominatorNumber = denominator ? toNumberOrNull(denominator) : 2
   if (ratioNumber === null || denominatorNumber === null) return ''
   return formatPricingNumber(ratioNumber * denominatorNumber)
 }
-
-const displayPrice = (value: string) =>
-  `${getPricingUnitAffixes().prefix}${value}`
 
 export const getModeLabel = (mode?: string) => {
   if (mode === 'per-request') return 'Per-request'
@@ -115,11 +106,7 @@ export const getPriceSummary = (
     return getExpressionSummary(row, t)
   }
   if (row.billingMode === 'per-request') {
-    return row.price
-      ? `${displayPrice(systemPriceToDisplayAmount(row.price))} / ${t(
-          'request'
-        )}`
-      : t('Unset price')
+    return row.price ? `$${row.price} / ${t('request')}` : t('Unset price')
   }
 
   const inputPrice = ratioToPrice(row.ratio)
@@ -135,10 +122,8 @@ export const getPriceSummary = (
   ].filter(hasPricingValue).length
 
   return extraCount > 0
-    ? `${t('Input')} ${displayPrice(inputPrice)} · ${extraCount} ${t(
-        'extras'
-      )}`
-    : `${t('Input')} ${displayPrice(inputPrice)}`
+    ? `${t('Input')} $${inputPrice} · ${extraCount} ${t('extras')}`
+    : `${t('Input')} $${inputPrice}`
 }
 
 export const getPriceDetail = (
@@ -159,15 +144,11 @@ export const getPriceDetail = (
 
   const details = [
     row.completionRatio &&
-      `${t('Output')} ${displayPrice(
-        ratioToPrice(row.completionRatio, inputPrice)
-      )}`,
+      `${t('Output')} $${ratioToPrice(row.completionRatio, inputPrice)}`,
     row.cacheRatio &&
-      `${t('Cache')} ${displayPrice(ratioToPrice(row.cacheRatio, inputPrice))}`,
+      `${t('Cache')} $${ratioToPrice(row.cacheRatio, inputPrice)}`,
     row.createCacheRatio &&
-      `${t('Cache write')} ${displayPrice(
-        ratioToPrice(row.createCacheRatio, inputPrice)
-      )}`,
+      `${t('Cache write')} $${ratioToPrice(row.createCacheRatio, inputPrice)}`,
   ]
     .filter(Boolean)
     .slice(0, 2)
