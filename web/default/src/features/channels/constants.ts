@@ -77,6 +77,7 @@ export const CHANNEL_TYPES = {
   56: 'Replicate',
   57: 'ChatGPT Subscription (Codex)',
   58: 'Advanced Custom',
+  59: 'Jimeng Dimensio',
 } as const
 
 const CHANNEL_TYPE_DISPLAY_ORDER: number[] = [
