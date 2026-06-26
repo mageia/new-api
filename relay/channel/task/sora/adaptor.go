@@ -39,22 +39,46 @@ type ImageURL struct {
 }
 
 type responseTask struct {
-	ID                 string `json:"id"`
-	TaskID             string `json:"task_id,omitempty"` //兼容旧接口
-	Object             string `json:"object"`
-	Model              string `json:"model"`
-	Status             string `json:"status"`
-	Progress           int    `json:"progress"`
-	CreatedAt          int64  `json:"created_at"`
-	CompletedAt        int64  `json:"completed_at,omitempty"`
-	ExpiresAt          int64  `json:"expires_at,omitempty"`
-	Seconds            string `json:"seconds,omitempty"`
-	Size               string `json:"size,omitempty"`
-	RemixedFromVideoID string `json:"remixed_from_video_id,omitempty"`
-	Error              *struct {
+	ID                 string   `json:"id"`
+	TaskID             string   `json:"task_id,omitempty"` //兼容旧接口
+	Object             string   `json:"object"`
+	Model              string   `json:"model"`
+	Status             string   `json:"status"`
+	Progress           int      `json:"progress"`
+	CreatedAt          int64    `json:"created_at"`
+	CompletedAt        int64    `json:"completed_at,omitempty"`
+	ExpiresAt          int64    `json:"expires_at,omitempty"`
+	Seconds            string   `json:"seconds,omitempty"`
+	Size               string   `json:"size,omitempty"`
+	RemixedFromVideoID string   `json:"remixed_from_video_id,omitempty"`
+	ResultURL          string   `json:"result_url,omitempty"`
+	VideoURL           string   `json:"video_url,omitempty"`
+	URL                string   `json:"url,omitempty"`
+	Output             []string `json:"output,omitempty"`
+	Video              *struct {
+		URL string `json:"url,omitempty"`
+	} `json:"video,omitempty"`
+	Error *struct {
 		Message string `json:"message"`
 		Code    string `json:"code"`
 	} `json:"error,omitempty"`
+}
+
+func extractResponseTaskVideoURL(task responseTask) string {
+	for _, candidate := range []string{task.VideoURL, task.ResultURL, task.URL} {
+		if strings.TrimSpace(candidate) != "" {
+			return strings.TrimSpace(candidate)
+		}
+	}
+	if task.Video != nil && strings.TrimSpace(task.Video.URL) != "" {
+		return strings.TrimSpace(task.Video.URL)
+	}
+	for _, candidate := range task.Output {
+		if strings.TrimSpace(candidate) != "" {
+			return strings.TrimSpace(candidate)
+		}
+	}
+	return ""
 }
 
 // ============================
@@ -297,15 +321,15 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 		Code: 0,
 	}
 
-	switch resTask.Status {
+	switch strings.ToLower(strings.TrimSpace(resTask.Status)) {
 	case "queued", "pending":
 		taskResult.Status = model.TaskStatusQueued
-	case "processing", "in_progress":
+	case "processing", "in_progress", "running":
 		taskResult.Status = model.TaskStatusInProgress
-	case "completed":
+	case "completed", "complete", "done", "succeeded", "success":
 		taskResult.Status = model.TaskStatusSuccess
-		// Url intentionally left empty — the caller constructs the proxy URL using the public task ID
-	case "failed", "cancelled":
+		taskResult.Url = extractResponseTaskVideoURL(resTask)
+	case "failed", "cancelled", "canceled", "error":
 		taskResult.Status = model.TaskStatusFailure
 		if resTask.Error != nil {
 			taskResult.Reason = resTask.Error.Message
