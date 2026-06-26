@@ -20,7 +20,7 @@ For commercial licensing, please contact support@quantumnous.com
 import i18next from 'i18next';
 import { Modal, Tag, Typography, Avatar } from '@douyinfe/semi-ui';
 import { copy, showSuccess } from './utils';
-import { getDynamicParametricSummary } from './dynamicBillingExpr';
+import { getDynamicParametricSummary, splitBillingExprAndRequestRules } from './dynamicBillingExpr';
 import { MOBILE_BREAKPOINT } from '../hooks/common/useIsMobile';
 import {
   BILLING_PRICING_VARS,

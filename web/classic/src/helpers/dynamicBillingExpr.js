@@ -109,6 +109,40 @@ function splitTopLevelByOperator(expr, operator) {
   return parts.filter(Boolean);
 }
 
+
+function splitTopLevelMultiply(expr) {
+  return splitTopLevelByOperator(String(expr || ''), '*');
+}
+
+export function splitBillingExprAndRequestRules(expr) {
+  const trimmed = String(expr || '').trim();
+  if (!trimmed) return { billingExpr: '', requestRuleExpr: '' };
+
+  const parts = splitTopLevelMultiply(trimmed);
+  if (parts.length <= 1) return { billingExpr: trimmed, requestRuleExpr: '' };
+
+  const ruleParts = [];
+  const baseParts = [];
+
+  parts.forEach((part) => {
+    const unwrapped = unwrapOuterParens(part);
+    if (/^(when|if)\s*\(/.test(unwrapped) || /^(param|header|hour|minute|weekday|month|day)\s*\(/.test(unwrapped)) {
+      ruleParts.push(part);
+    } else {
+      baseParts.push(part);
+    }
+  });
+
+  if (ruleParts.length === 0 || baseParts.length !== 1) {
+    return { billingExpr: trimmed, requestRuleExpr: '' };
+  }
+
+  return {
+    billingExpr: unwrapOuterParens(baseParts[0]),
+    requestRuleExpr: ruleParts.join(' * '),
+  };
+}
+
 export function scanTierCalls(expr) {
   const calls = [];
   let cursor = 0;
