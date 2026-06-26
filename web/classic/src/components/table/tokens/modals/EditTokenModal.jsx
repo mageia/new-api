@@ -193,6 +193,11 @@ const EditTokenModal = (props) => {
 
   useEffect(() => {
     if (props.visiable) {
+      // Refresh selectable groups each time the sheet opens. User group changes
+      // can happen while the token page is already mounted, and otherwise the
+      // token group dropdown keeps stale options until a full page reload.
+      loadGroups();
+      loadModels();
       if (isEdit) {
         loadToken();
       } else {

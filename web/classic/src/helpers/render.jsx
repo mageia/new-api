@@ -20,6 +20,7 @@ For commercial licensing, please contact support@quantumnous.com
 import i18next from 'i18next';
 import { Modal, Tag, Typography, Avatar } from '@douyinfe/semi-ui';
 import { copy, showSuccess } from './utils';
+import { getDynamicParametricSummary } from './dynamicBillingExpr';
 import { MOBILE_BREAKPOINT } from '../hooks/common/useIsMobile';
 import {
   BILLING_PRICING_VARS,
@@ -2301,6 +2302,38 @@ export function renderTieredModelPrice(opts) {
   } = opts;
   let exprStr = '';
   try { exprStr = decodeFromBase64(exprB64); } catch { /* ignore */ }
+  const { billingExpr: baseExpr } = splitBillingExprAndRequestRules(exprStr);
+  const parametricSummary = getDynamicParametricSummary(baseExpr, groupRatio || 1);
+  if (parametricSummary) {
+    const lines = [buildBillingText('命中档位：{{tier}}', { tier: matchedTier || '-' })];
+    if (parametricSummary.kind === 'request_tiers') {
+      const normalizedMatched = normalizeLabel(matchedTier);
+      const matched = parametricSummary.groups.find((group) => normalizeLabel(group.label) === normalizedMatched);
+      if (matched) {
+        lines.push(buildBillingText('价格：{{price}} / 次', { price: matched.valueText }));
+      } else {
+        lines.push(
+          ...parametricSummary.groups.map((group) =>
+            buildBillingText('{{tier}}：{{price}} / 次', { tier: group.label, price: group.valueText }),
+          ),
+        );
+      }
+    } else {
+      lines.push(
+        buildBillingText('时长：{{duration}} 秒', { duration: parametricSummary.durationLabel }),
+        buildBillingText('公式：{{formula}}', { formula: parametricSummary.baseFormulaText }),
+        ...parametricSummary.tiers.map((tier) =>
+          buildBillingText('{{tier}}：{{price}} / 次（{{formula}}）', {
+            tier: tier.label,
+            price: tier.valueText,
+            formula: tier.formulaText,
+          }),
+        ),
+      );
+    }
+    return renderBillingArticle(lines);
+  }
+
   const tiers = parseTiersFromExpr(exprStr);
   if (tiers.length === 0) {
     return i18next.t('阶梯计费（表达式解析失败）');
@@ -2353,6 +2386,8 @@ export function renderTieredModelPriceSimple(opts) {
   } = opts;
   let exprStr = '';
   try { exprStr = decodeFromBase64(exprB64); } catch { /* ignore */ }
+  const { billingExpr: baseExpr } = splitBillingExprAndRequestRules(exprStr);
+  const parametricSummary = getDynamicParametricSummary(baseExpr, groupRatio || 1);
   const tiers = parseTiersFromExpr(exprStr);
   const tier =
       tiers.find((t) => {
@@ -2369,7 +2404,32 @@ export function renderTieredModelPriceSimple(opts) {
       },
     ];
 
-    if (!tier) {
+    if (parametricSummary?.chips?.length) {
+      const normalizedMatched = normalizeLabel(matchedTier);
+      const groups = parametricSummary.kind === 'request_tiers'
+        ? parametricSummary.groups
+        : parametricSummary.tiers;
+      const matched = groups.find((group) => normalizeLabel(group.label) === normalizedMatched);
+      if (matched) {
+        segments.push({
+          tone: 'secondary',
+          text: i18next.t('{{tier}} {{price}} / 次', {
+            tier: matched.label,
+            price: matched.valueText,
+          }),
+        });
+      } else {
+        parametricSummary.chips.forEach((chip) => {
+          segments.push({
+            tone: 'secondary',
+            text: i18next.t('{{tier}} {{price}} / 次', {
+              tier: chip.label,
+              price: chip.valueText,
+            }),
+          });
+        });
+      }
+    } else if (!tier) {
       segments.push({
         tone: 'secondary',
         text: tiers.length === 0

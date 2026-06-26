@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { Toast, Pagination } from '@douyinfe/semi-ui';
 import { toastConstants, BILLING_PRICING_VARS, BILLING_VAR_REGEX } from '../constants';
+import { getDynamicParametricSummary } from './dynamicBillingExpr';
 import React from 'react';
 import { toast } from 'react-toastify';
 import {
@@ -926,6 +927,7 @@ export const formatDynamicPriceSummary = (billingExpr, t, groupRatio = 1) => {
     if (!(vm[1] in varCoeffs)) varCoeffs[vm[1]] = Number(vm[2]);
   }
   const hasCoeffs = 'p' in varCoeffs || 'c' in varCoeffs;
+  const parametricSummary = getDynamicParametricSummary(exprBody, gr);
 
   const varLabels = BILLING_PRICING_VARS.map((v) => [v.key, v.label]);
 
@@ -942,6 +944,15 @@ export const formatDynamicPriceSummary = (billingExpr, t, groupRatio = 1) => {
 
   return (
     <>
+      {!hasCoeffs && parametricSummary?.chips?.length ? (
+        <>
+          {parametricSummary.chips.map((chip) => (
+            <span key={chip.key} style={lineStyle}>
+              {`${chip.label} ${chip.valueText} / ${t('次')}`}
+            </span>
+          ))}
+        </>
+      ) : null}
       {hasCoeffs && (
         <>
           {varLabels.map(([key, label]) =>

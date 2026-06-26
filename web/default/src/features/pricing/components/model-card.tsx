@@ -132,6 +132,21 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
                       </span>
                     ))}
                   </>
+                ) : dynamicSummary.parametricSummary?.chips?.length ? (
+                  <>
+                    {dynamicSummary.parametricSummary.chips.map((chip) => (
+                      <span
+                        key={chip.key}
+                        className='text-muted-foreground whitespace-nowrap'
+                      >
+                        {chip.label}{' '}
+                        <span className='text-foreground font-mono font-semibold'>
+                          {chip.valueText}
+                        </span>
+                        / {t('request')}
+                      </span>
+                    ))}
+                  </>
                 ) : (
                   <span className='text-muted-foreground text-xs'>
                     {t('Dynamic Pricing')}

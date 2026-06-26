@@ -144,6 +144,28 @@ export function usePricingColumns(
 
           const primaryEntries = dynamicSummary.primaryEntries.slice(0, 2)
           if (primaryEntries.length === 0) {
+            if (dynamicSummary.parametricSummary?.chips?.length) {
+              const chips = dynamicSummary.parametricSummary.chips.slice(0, 2)
+              return (
+                <div className='max-w-full min-w-0'>
+                  <span className='font-mono text-sm tabular-nums'>
+                    {chips.map((chip, index) => (
+                      <span key={chip.key}>
+                        {index > 0 && (
+                          <span className='text-muted-foreground/40 mx-1'>
+                            /
+                          </span>
+                        )}
+                        {chip.label} {chip.valueText}
+                      </span>
+                    ))}
+                  </span>
+                  <div className='text-muted-foreground/50 text-[10px]'>
+                    / {t('request')}
+                  </div>
+                </div>
+              )
+            }
             return (
               <span className='text-muted-foreground text-xs'>
                 {t('Dynamic Pricing')}

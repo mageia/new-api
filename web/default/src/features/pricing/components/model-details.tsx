@@ -58,8 +58,10 @@ import {
 } from '@/features/performance-metrics/lib/format'
 import { DEFAULT_TOKEN_UNIT, QUOTA_TYPE_VALUES } from '../constants'
 import { usePricingData } from '../hooks/use-pricing-data'
+import { splitBillingExprAndRequestRules } from '../lib/billing-expr'
 import {
   getDynamicPriceEntries,
+  getDynamicParametricSummary,
   getDynamicPricingSummary,
   getDynamicPricingTiers,
   isDynamicPricingModel,
@@ -689,6 +691,22 @@ function PriceSection(props: {
               </div>
             ))}
           </div>
+        ) : dynamicSummary.parametricSummary?.chips?.length ? (
+          <div className='grid grid-cols-1 gap-2 sm:grid-cols-2'>
+            {dynamicSummary.parametricSummary.chips.map((chip) => (
+              <div key={chip.key} className='bg-muted/20 rounded-lg border p-3'>
+                <div className='text-muted-foreground text-xs'>
+                  {chip.label}
+                </div>
+                <div className='text-foreground mt-1 font-mono text-base font-semibold tabular-nums'>
+                  {chip.valueText}
+                  <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
+                    / {t('request')}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
           <p className='text-muted-foreground text-sm'>
             {t('Dynamic Pricing')}
@@ -925,8 +943,91 @@ function GroupPricingSection(props: {
 
   if (isDynamicPricingModel(props.model)) {
     const dynamicTiers = getDynamicPricingTiers(props.model)
+    const { billingExpr: baseDynamicExpr } = splitBillingExprAndRequestRules(
+      props.model.billing_expr || ''
+    )
+    const priceFields = getDynamicPriceFields(dynamicTiers, {
+      tokenUnit: props.tokenUnit,
+      showRechargePrice,
+      priceRate: props.priceRate,
+      usdExchangeRate: props.usdExchangeRate,
+      groupRatioMultiplier: 1,
+    })
+    const baseParametricSummary = getDynamicParametricSummary(
+      baseDynamicExpr,
+      1
+    )
+    const shouldRenderParametricByGroup =
+      dynamicTiers.length === 0 ||
+      (priceFields.length === 0 && baseParametricSummary != null)
 
-    if (dynamicTiers.length === 0) {
+    if (shouldRenderParametricByGroup) {
+      const parametricByGroup = availableGroups
+        .map((group) => {
+          const ratio = props.groupRatio[group] || 1
+          return {
+            group,
+            ratio,
+            summary: getDynamicParametricSummary(baseDynamicExpr, ratio),
+          }
+        })
+        .filter((item) => item.summary != null)
+
+      if (parametricByGroup.length > 0) {
+        return (
+          <section>
+            <SectionTitle>{t('Pricing by Group')}</SectionTitle>
+            <AutoGroupChain model={props.model} autoGroups={props.autoGroups} />
+            <div className='space-y-3'>
+              {parametricByGroup.map(({ group, ratio, summary }) => (
+                <div key={group} className='overflow-hidden rounded-lg border'>
+                  <div className='bg-muted/20 flex items-center justify-between gap-3 border-b px-3 py-2'>
+                    <GroupBadge group={group} size='sm' />
+                    <span className='text-muted-foreground font-mono text-xs'>
+                      {ratio}x
+                    </span>
+                  </div>
+                  <div className='space-y-2 px-3 py-3'>
+                    {summary?.kind === 'request_tiers'
+                      ? summary.groups.map((item) => (
+                          <div
+                            key={item.key}
+                            className='flex items-center justify-between gap-4 rounded-md border px-3 py-2'
+                          >
+                            <span className='text-muted-foreground text-sm'>
+                              {item.label}
+                            </span>
+                            <span className='font-mono text-sm font-semibold tabular-nums'>
+                              {item.valueText} / {t('request')}
+                            </span>
+                          </div>
+                        ))
+                      : summary?.tiers.map((tier) => (
+                          <div
+                            key={tier.label}
+                            className='rounded-md border px-3 py-2'
+                          >
+                            <div className='flex items-center justify-between gap-4'>
+                              <span className='text-muted-foreground text-sm'>
+                                {tier.label}
+                              </span>
+                              <span className='font-mono text-sm font-semibold tabular-nums'>
+                                {tier.valueText} / {t('request')}
+                              </span>
+                            </div>
+                            <div className='text-muted-foreground mt-1 text-xs'>
+                              {tier.formulaText}
+                            </div>
+                          </div>
+                        ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )
+      }
+
       return (
         <section>
           <SectionTitle>{t('Pricing by Group')}</SectionTitle>
@@ -953,13 +1054,6 @@ function GroupPricingSection(props: {
       )
     }
 
-    const priceFields = getDynamicPriceFields(dynamicTiers, {
-      tokenUnit: props.tokenUnit,
-      showRechargePrice,
-      priceRate: props.priceRate,
-      usdExchangeRate: props.usdExchangeRate,
-      groupRatioMultiplier: 1,
-    })
     const formattedPricesByGroup = new Map(
       availableGroups.map((group) => {
         const ratio = props.groupRatio[group] || 1

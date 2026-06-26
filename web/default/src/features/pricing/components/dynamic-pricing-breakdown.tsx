@@ -41,6 +41,7 @@ import {
   type RequestRuleGroup,
   type TierCondition,
 } from '../lib/billing-expr'
+import { getDynamicParametricSummary } from '../lib/dynamic-price'
 
 type DynamicPricingBreakdownProps = {
   billingExpr: string | null | undefined
@@ -168,13 +169,14 @@ export function DynamicPricingBreakdown({
     return { symbol: '$', rate: 1 }
   }, [currency])
 
-  const { tiers, ruleGroups } = useMemo(() => {
+  const { tiers, ruleGroups, parametricSummary } = useMemo(() => {
     const split = splitBillingExprAndRequestRules(expr)
     const parsedTiers = parseTiersFromExpr(split.billingExpr)
     const parsedRules = tryParseRequestRuleExpr(split.requestRuleExpr || '')
     return {
       tiers: parsedTiers,
       ruleGroups: parsedRules || [],
+      parametricSummary: getDynamicParametricSummary(split.billingExpr),
     }
   }, [expr])
 
@@ -186,7 +188,7 @@ export function DynamicPricingBreakdown({
 
   if (!expr) return null
 
-  if (!hasTiers) {
+  if (!hasTiers && !parametricSummary) {
     return (
       <section className='min-w-0 py-4'>
         <div className='mb-3 flex items-center gap-2'>
@@ -236,7 +238,56 @@ export function DynamicPricingBreakdown({
         </div>
       </div>
 
-      {hasTiers && (
+      {parametricSummary && (
+        <div className='mb-3 sm:mb-4'>
+          <div className='text-foreground mb-2 text-sm font-semibold'>
+            {t('Tiered price table')}
+          </div>
+          <div className='space-y-2'>
+            {parametricSummary.kind === 'request_tiers' ? (
+              parametricSummary.groups.map((group) => (
+                <div
+                  key={group.key}
+                  className='flex items-center justify-between gap-4 rounded-md border px-3 py-2'
+                >
+                  <span className='text-muted-foreground text-sm'>
+                    {group.label}
+                  </span>
+                  <span className='font-mono text-sm font-semibold tabular-nums'>
+                    {group.valueText} / {t('request')}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <>
+                <div className='text-muted-foreground rounded-md border px-3 py-2 text-xs'>
+                  {t('Duration')} {parametricSummary.durationLabel}
+                  {t('seconds')}
+                  {' · '}
+                  {parametricSummary.baseFormulaText}
+                </div>
+                {parametricSummary.tiers.map((tier) => (
+                  <div key={tier.label} className='rounded-md border px-3 py-2'>
+                    <div className='flex items-center justify-between gap-4'>
+                      <span className='text-muted-foreground text-sm'>
+                        {tier.label}
+                      </span>
+                      <span className='font-mono text-sm font-semibold tabular-nums'>
+                        {tier.valueText} / {t('request')}
+                      </span>
+                    </div>
+                    <div className='text-muted-foreground mt-1 text-xs'>
+                      {tier.formulaText}
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {hasTiers && !parametricSummary && (
         <div className='mb-3 sm:mb-4'>
           <div className='text-foreground mb-2 text-sm font-semibold'>
             {t('Tiered price table')}
