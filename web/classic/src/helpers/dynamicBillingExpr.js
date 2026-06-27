@@ -315,30 +315,15 @@ function parseRequestTierSummary(expr, groupRatioMultiplier) {
   };
 }
 
-function parseDurationExprBody(body) {
-  let expr = unwrapOuterParens(body);
-  let multiplier = 1;
 
-  const topLevelMultiply = splitTopLevelByOperator(expr, '*');
-  if (
-    topLevelMultiply.length === 2 &&
-    hasFullOuterParens(topLevelMultiply[0]) &&
-    isNumericLiteral(topLevelMultiply[1]) &&
-    !isNumericLiteral(topLevelMultiply[0])
-  ) {
-    multiplier = Number(topLevelMultiply[1]);
-    expr = unwrapOuterParens(topLevelMultiply[0]);
-  }
+function flattenTopLevelMultiplication(expr) {
+  const current = unwrapOuterParens(expr);
+  const parts = splitTopLevelByOperator(current, '*');
+  if (parts.length <= 1) return [current];
+  return parts.flatMap((part) => flattenTopLevelMultiplication(part));
+}
 
-  const plusParts = splitTopLevelByOperator(expr, '+');
-  if (plusParts.length !== 2 || !isNumericLiteral(plusParts[0])) return null;
-
-  const baseCredits = Number(plusParts[0]);
-  const rateParts = splitTopLevelByOperator(plusParts[1], '*');
-  if (rateParts.length !== 2 || !isNumericLiteral(rateParts[1])) return null;
-
-  const creditsPerSecond = Number(rateParts[1]);
-  const durationBranch = unwrapOuterParens(rateParts[0]);
+function extractDurationBranchValues(durationBranch) {
   const comparisonMatches = Array.from(
     durationBranch.matchAll(/param\("([^"]+)"\)\s*==\s*"?(.*?)"?\s*\?\s*([\d.eE+-]+)/g),
   );
@@ -357,10 +342,43 @@ function parseDurationExprBody(body) {
     durationParam,
     minDuration: Math.min(...durationValues),
     maxDuration: Math.max(...durationValues),
-    baseCredits,
-    creditsPerSecond,
-    multiplier,
   };
+}
+
+function parseDurationExprBody(body) {
+  const expr = unwrapOuterParens(body);
+  let multiplier = 1;
+
+  const plusParts = splitTopLevelByOperator(expr, '+');
+  if (plusParts.length === 2 && isNumericLiteral(plusParts[0])) {
+    const baseCredits = Number(plusParts[0]);
+    const rateParts = splitTopLevelByOperator(plusParts[1], '*');
+    if (rateParts.length !== 2 || !isNumericLiteral(rateParts[1])) return null;
+
+    const creditsPerSecond = Number(rateParts[1]);
+    const durationBranch = unwrapOuterParens(rateParts[0]);
+    const durationValues = extractDurationBranchValues(durationBranch);
+    if (!durationValues) return null;
+
+    return { ...durationValues, baseCredits, creditsPerSecond, multiplier };
+  }
+
+  const factors = flattenTopLevelMultiplication(expr);
+  const durationFactorIndex = factors.findIndex((factor) => /param\("[^"]+"\)\s*==/.test(factor));
+  if (durationFactorIndex < 0) return null;
+
+  const durationValues = extractDurationBranchValues(unwrapOuterParens(factors[durationFactorIndex]));
+  if (!durationValues) return null;
+
+  let creditsPerSecond = 1;
+  for (const [index, factor] of factors.entries()) {
+    if (index === durationFactorIndex) continue;
+    const unwrapped = unwrapOuterParens(factor);
+    if (!isNumericLiteral(unwrapped)) return null;
+    creditsPerSecond *= Number(unwrapped);
+  }
+
+  return { ...durationValues, baseCredits: 0, creditsPerSecond, multiplier };
 }
 
 function parseDurationTierSummary(expr, groupRatioMultiplier) {
@@ -382,30 +400,35 @@ function parseDurationTierSummary(expr, groupRatioMultiplier) {
   const compatible = parsedTiers.every(
     (tier) =>
       tier.durationParam === reference.durationParam &&
-      Math.abs(tier.baseCredits - reference.baseCredits) < 1e-9 &&
-      Math.abs(tier.creditsPerSecond - reference.creditsPerSecond) < 1e-9 &&
       tier.minDuration === reference.minDuration &&
       tier.maxDuration === reference.maxDuration,
   );
   if (!compatible) return null;
 
   const durationLabel = `${reference.minDuration}-${reference.maxDuration}`;
-  const baseFormulaText = `${formatPlainNumber(reference.baseCredits * groupRatioMultiplier)} + ${reference.durationParam} × ${formatPlainNumber(reference.creditsPerSecond * groupRatioMultiplier)}`;
+  const displayBaseCredits = (reference.baseCredits * groupRatioMultiplier) / REQUEST_CREDIT_EXPR_SCALE;
+  const displayCreditsPerSecond = (reference.creditsPerSecond * groupRatioMultiplier) / REQUEST_CREDIT_EXPR_SCALE;
+  const baseFormulaText = `${reference.durationParam} × ${formatPlainNumber(displayCreditsPerSecond)} 积分`;
 
   const tiers = parsedTiers
     .map((tier) => {
       const minValue =
-        (tier.baseCredits + tier.minDuration * tier.creditsPerSecond) * tier.multiplier * groupRatioMultiplier;
+        ((tier.baseCredits + tier.minDuration * tier.creditsPerSecond) * tier.multiplier * groupRatioMultiplier) / REQUEST_CREDIT_EXPR_SCALE;
       const maxValue =
-        (tier.baseCredits + tier.maxDuration * tier.creditsPerSecond) * tier.multiplier * groupRatioMultiplier;
+        ((tier.baseCredits + tier.maxDuration * tier.creditsPerSecond) * tier.multiplier * groupRatioMultiplier) / REQUEST_CREDIT_EXPR_SCALE;
+      const tierBaseCredits = (tier.baseCredits * groupRatioMultiplier) / REQUEST_CREDIT_EXPR_SCALE;
+      const tierCreditsPerSecond = (tier.creditsPerSecond * groupRatioMultiplier) / REQUEST_CREDIT_EXPR_SCALE;
       const multiplierText = Math.abs(tier.multiplier - 1) < 1e-9 ? '' : ` × ${formatPlainNumber(tier.multiplier)}`;
+      const tierFormulaText = Math.abs(tierBaseCredits) < 1e-9
+        ? `${tier.durationParam} × ${formatPlainNumber(tierCreditsPerSecond)} 积分${multiplierText}`
+        : `${formatPlainNumber(tierBaseCredits)} + ${tier.durationParam} × ${formatPlainNumber(tierCreditsPerSecond)} 积分${multiplierText}`;
       return {
         label: tier.label,
         multiplier: tier.multiplier,
         minValue,
         maxValue,
-        valueText: formatPlainRange(minValue, maxValue),
-        formulaText: `${baseFormulaText}${multiplierText}`,
+        valueText: `${formatPlainRange(minValue, maxValue)} 积分`,
+        formulaText: tierFormulaText,
       };
     })
     .sort((a, b) => a.multiplier - b.multiplier);
@@ -420,8 +443,8 @@ function parseDurationTierSummary(expr, groupRatioMultiplier) {
     durationLabel,
     minDuration: reference.minDuration,
     maxDuration: reference.maxDuration,
-    baseCredits: reference.baseCredits * groupRatioMultiplier,
-    creditsPerSecond: reference.creditsPerSecond * groupRatioMultiplier,
+    baseCredits: displayBaseCredits,
+    creditsPerSecond: displayCreditsPerSecond,
     baseFormulaText,
     tiers,
   };
