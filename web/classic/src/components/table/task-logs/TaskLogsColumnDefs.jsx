@@ -144,21 +144,7 @@ const renderType = (type, t) => {
 };
 
 
-const getTaskModelName = (record) => {
-  const properties = record?.properties;
-  if (!properties) return '';
-
-  if (typeof properties === 'string') {
-    try {
-      const parsed = JSON.parse(properties);
-      return parsed?.origin_model_name || parsed?.upstream_model_name || '';
-    } catch (e) {
-      return '';
-    }
-  }
-
-  return properties.origin_model_name || properties.upstream_model_name || '';
-};
+const getTaskModelName = (record) => record?.model_name || '';
 
 const renderPlatform = (platform, t) => {
   let option = CHANNEL_OPTIONS.find(
