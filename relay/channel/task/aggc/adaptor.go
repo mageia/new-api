@@ -44,6 +44,9 @@ type jsonRequest struct {
 	AudioURLs   []string       `json:"audio_urls,omitempty"`
 	Duration    int            `json:"duration,omitempty"`
 	Seconds     string         `json:"seconds,omitempty"`
+	Size        string         `json:"size,omitempty"`
+	Orientation string         `json:"orientation,omitempty"`
+	Watermark   *bool          `json:"watermark,omitempty"`
 	AspectRatio string         `json:"aspect_ratio,omitempty"`
 	Ratio       string         `json:"ratio,omitempty"`
 	Params      map[string]any `json:"params,omitempty"`
@@ -59,6 +62,9 @@ type requestPayload struct {
 
 type requestParams struct {
 	Duration    int      `json:"duration,omitempty"`
+	Resolution  string   `json:"resolution,omitempty"`
+	Orientation string   `json:"orientation,omitempty"`
+	Watermark   *bool    `json:"watermark,omitempty"`
 	AudioURLs   []string `json:"audioUrls,omitempty"`
 	ImageURLs   []string `json:"imageUrls,omitempty"`
 	VideoURLs   []string `json:"videoUrls,omitempty"`
@@ -152,6 +158,15 @@ func copyAggcRawMetadata(raw jsonRequest, metadata map[string]any) {
 	}
 	if strings.TrimSpace(raw.Ratio) != "" {
 		metadata["ratio"] = raw.Ratio
+	}
+	if strings.TrimSpace(raw.Size) != "" {
+		metadata["size"] = raw.Size
+	}
+	if strings.TrimSpace(raw.Orientation) != "" {
+		metadata["orientation"] = raw.Orientation
+	}
+	if raw.Watermark != nil {
+		metadata["watermark"] = *raw.Watermark
 	}
 	if len(raw.Params) > 0 {
 		for k, v := range raw.Params {
@@ -306,13 +321,24 @@ func (a *TaskAdaptor) GetModelList() []string { return ModelList }
 func (a *TaskAdaptor) GetChannelName() string { return ChannelName }
 
 func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq, info *relaycommon.RelayInfo) (*requestPayload, error) {
-	modelName := firstNonEmpty(info.UpstreamModelName, req.Model)
+	upstreamModelName := ""
+	if info != nil && info.ChannelMeta != nil {
+		upstreamModelName = info.ChannelMeta.UpstreamModelName
+	}
+	modelName := firstNonEmpty(upstreamModelName, req.Model)
+	aspectRatio := normalizeAspectRatio(req.Metadata)
+	if aspectRatio == "" {
+		aspectRatio = aspectRatioFromSizeOrOrientation(normalizeSize(req.Size, req.Metadata), stringValue(req.Metadata["orientation"]))
+	}
 	params := requestParams{
 		Duration:    normalizeDuration(req.Duration, req.Seconds, req.Metadata),
+		Resolution:  normalizeResolution(req.Metadata, req.Size),
+		Orientation: stringValue(req.Metadata["orientation"]),
+		Watermark:   boolPointer(req.Metadata["watermark"]),
 		ImageURLs:   mergeStrings(req.Images, stringList(req.Metadata["image_urls"])),
 		VideoURLs:   stringList(req.Metadata["video_urls"]),
 		AudioURLs:   stringList(req.Metadata["audio_urls"]),
-		AspectRatio: normalizeAspectRatio(req.Metadata),
+		AspectRatio: aspectRatio,
 	}
 	payload := &requestPayload{
 		ModelID: modelName,
@@ -376,7 +402,91 @@ func normalizeDuration(duration int, seconds string, metadata map[string]any) in
 }
 
 func normalizeAspectRatio(metadata map[string]any) string {
-	return firstNonEmpty(stringValue(metadata["aspectRatio"]), stringValue(metadata["aspect_ratio"]), stringValue(metadata["ratio"]), stringValue(metadata["aspectRatio"]))
+	return firstNonEmpty(stringValue(metadata["aspectRatio"]), stringValue(metadata["aspect_ratio"]), stringValue(metadata["ratio"]))
+}
+
+func normalizeSize(size string, metadata map[string]any) string {
+	return firstNonEmpty(size, stringValue(metadata["size"]))
+}
+
+func normalizeResolution(metadata map[string]any, size string) string {
+	resolution := firstNonEmpty(stringValue(metadata["resolution"]), stringValue(metadata["分辨率"]))
+	if resolution != "" {
+		return resolution
+	}
+	return resolutionFromSize(normalizeSize(size, metadata))
+}
+
+func resolutionFromSize(size string) string {
+	s := strings.ToLower(strings.TrimSpace(strings.ReplaceAll(size, "×", "x")))
+	parts := strings.Split(s, "x")
+	if len(parts) != 2 {
+		return ""
+	}
+	w, errW := strconv.Atoi(strings.TrimSpace(parts[0]))
+	h, errH := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if errW != nil || errH != nil || w <= 0 || h <= 0 {
+		return ""
+	}
+	shortSide := w
+	if h < shortSide {
+		shortSide = h
+	}
+	return fmt.Sprintf("%dp", shortSide)
+}
+
+func aspectRatioFromSizeOrOrientation(size, orientation string) string {
+	s := strings.ToLower(strings.TrimSpace(strings.ReplaceAll(size, "×", "x")))
+	parts := strings.Split(s, "x")
+	if len(parts) == 2 {
+		w, errW := strconv.Atoi(strings.TrimSpace(parts[0]))
+		h, errH := strconv.Atoi(strings.TrimSpace(parts[1]))
+		if errW == nil && errH == nil && w > 0 && h > 0 {
+			g := gcd(w, h)
+			return fmt.Sprintf("%d:%d", w/g, h/g)
+		}
+	}
+	switch strings.ToLower(strings.TrimSpace(orientation)) {
+	case "landscape":
+		return "16:9"
+	case "portrait":
+		return "9:16"
+	case "square":
+		return "1:1"
+	default:
+		return ""
+	}
+}
+
+func gcd(a, b int) int {
+	for b != 0 {
+		a, b = b, a%b
+	}
+	if a < 0 {
+		return -a
+	}
+	if a == 0 {
+		return 1
+	}
+	return a
+}
+
+func boolPointer(value any) *bool {
+	switch v := value.(type) {
+	case bool:
+		return &v
+	case string:
+		if strings.TrimSpace(v) == "" {
+			return nil
+		}
+		parsed, err := strconv.ParseBool(strings.TrimSpace(v))
+		if err != nil {
+			return nil
+		}
+		return &parsed
+	default:
+		return nil
+	}
 }
 
 func mergeStrings(groups ...[]string) []string {

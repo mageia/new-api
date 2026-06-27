@@ -5,6 +5,9 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseTaskResultSuccess(t *testing.T) {
@@ -33,4 +36,63 @@ func TestDoResponseExtractsTaskID(t *testing.T) {
 		t.Fatalf("unexpected job id: %s", anyToString(resp.Data.JobID))
 	}
 	_ = adaptor
+}
+
+func TestConvertToRequestPayloadConvertsTopLevelSize(t *testing.T) {
+	metadata := map[string]any{}
+	copyAggcRawMetadata(jsonRequest{Size: "1024x1024"}, metadata)
+
+	adaptor := &TaskAdaptor{}
+	payload, err := adaptor.convertToRequestPayload(&relaycommon.TaskSubmitReq{
+		Prompt:   "draw a cat",
+		Model:    "sd-bak-2",
+		Metadata: metadata,
+	}, &relaycommon.RelayInfo{})
+
+	require.NoError(t, err)
+	assert.Equal(t, "1024p", payload.Params.Resolution)
+	assert.Equal(t, "1:1", payload.Params.AspectRatio)
+}
+
+func TestConvertToRequestPayloadConvertsParamsSize(t *testing.T) {
+	metadata := map[string]any{}
+	copyAggcRawMetadata(jsonRequest{Params: map[string]any{"size": "512x768"}}, metadata)
+
+	adaptor := &TaskAdaptor{}
+	payload, err := adaptor.convertToRequestPayload(&relaycommon.TaskSubmitReq{
+		Prompt:   "draw a cat",
+		Model:    "sd-bak-2",
+		Metadata: metadata,
+	}, &relaycommon.RelayInfo{})
+
+	require.NoError(t, err)
+	assert.Equal(t, "512p", payload.Params.Resolution)
+	assert.Equal(t, "2:3", payload.Params.AspectRatio)
+}
+
+func TestConvertToRequestPayloadConvertsSizeAndCommonParams(t *testing.T) {
+	watermark := false
+	metadata := map[string]any{}
+	copyAggcRawMetadata(jsonRequest{
+		Size:        "1280x720",
+		Orientation: "landscape",
+		Watermark:   &watermark,
+	}, metadata)
+
+	adaptor := &TaskAdaptor{}
+	payload, err := adaptor.convertToRequestPayload(&relaycommon.TaskSubmitReq{
+		Prompt:   "draw a watch",
+		Model:    "sd-bak-2",
+		Images:   []string{"https://example.com/input.png"},
+		Duration: 5,
+		Metadata: metadata,
+	}, &relaycommon.RelayInfo{})
+
+	require.NoError(t, err)
+	assert.Equal(t, "720p", payload.Params.Resolution)
+	assert.Equal(t, "16:9", payload.Params.AspectRatio)
+	assert.Equal(t, "landscape", payload.Params.Orientation)
+	require.NotNil(t, payload.Params.Watermark)
+	assert.False(t, *payload.Params.Watermark)
+	assert.Equal(t, []string{"https://example.com/input.png"}, payload.Params.ImageURLs)
 }
