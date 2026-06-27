@@ -22,7 +22,6 @@ import { useTranslation } from 'react-i18next'
 import { useSystemConfigStore } from '@/stores/system-config-store'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import { CopyButton } from '@/components/copy-button'
 import { StaticDataTable } from '@/components/data-table'
 import {
   BILLING_PRICING_VARS,
@@ -205,24 +204,9 @@ export function DynamicPricingBreakdown({
             </div>
           </div>
         </div>
-        <div className='mb-1 flex items-center justify-between gap-2'>
-          <div className='text-muted-foreground text-[10px] font-medium tracking-wider uppercase'>
-            {t('Raw expression')}
-          </div>
-          <CopyButton
-            value={expr}
-            size='sm'
-            variant='outline'
-            className='h-7 px-2 text-xs'
-            iconClassName='size-3.5'
-            tooltip={t('Copy raw expression')}
-          >
-            {t('Copy')}
-          </CopyButton>
+        <div className='text-muted-foreground text-xs'>
+          {t('Please contact the administrator for pricing details')}
         </div>
-        <code className='bg-background text-muted-foreground block max-h-32 overflow-auto rounded-md border px-2 py-1.5 font-mono text-xs break-all'>
-          {expr}
-        </code>
       </section>
     )
   }
@@ -467,31 +451,6 @@ export function DynamicPricingBreakdown({
         </div>
       )}
 
-      <details className='mt-3 rounded-md border bg-muted/20 px-3 py-2'>
-        <summary className='text-muted-foreground cursor-pointer select-none text-xs font-medium'>
-          {t('View raw billing expression')}
-        </summary>
-        <div className='mt-2'>
-          <div className='mb-1 flex items-center justify-between gap-2'>
-            <span className='text-muted-foreground text-[10px] font-medium tracking-wider uppercase'>
-              {t('Raw expression')}
-            </span>
-            <CopyButton
-              value={expr}
-              size='sm'
-              variant='outline'
-              className='h-7 px-2 text-xs'
-              iconClassName='size-3.5'
-              tooltip={t('Copy raw expression')}
-            >
-              {t('Copy')}
-            </CopyButton>
-          </div>
-          <code className='bg-background text-muted-foreground block max-h-36 overflow-auto rounded-md border px-2 py-1.5 font-mono text-xs break-all'>
-            {expr}
-          </code>
-        </div>
-      </details>
     </section>
   )
 }

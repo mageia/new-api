@@ -18,8 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React from 'react';
-import { Avatar, Button, Tag, Table, Toast, Typography } from '@douyinfe/semi-ui';
-import { IconCopy, IconPriceTag } from '@douyinfe/semi-icons';
+import { Avatar, Tag, Table, Typography } from '@douyinfe/semi-ui';
+import { IconPriceTag } from '@douyinfe/semi-icons';
 import {
   parseTiersFromExpr,
   getCurrencyConfig,
@@ -97,49 +97,6 @@ function describeGroup(group, t) {
   return parts.join(' && ');
 }
 
-function copyRawExpression(expr, t) {
-  navigator.clipboard
-    ?.writeText(expr || '')
-    .then(() => Toast.success(t('已复制')))
-    .catch(() => Toast.error(t('复制失败')));
-}
-
-function RawExpressionBlock({ expr, t }) {
-  return (
-    <div style={{ marginTop: 12 }}>
-      <div className='flex items-center justify-between mb-1'>
-        <Text type='tertiary' size='small'>
-          {t('原始表达式')}
-        </Text>
-        <Button
-          size='small'
-          type='tertiary'
-          icon={<IconCopy />}
-          onClick={() => copyRawExpression(expr, t)}
-        >
-          {t('复制')}
-        </Button>
-      </div>
-      <code
-        style={{
-          display: 'block',
-          maxHeight: 120,
-          overflow: 'auto',
-          wordBreak: 'break-all',
-          padding: '8px 10px',
-          border: '1px solid var(--semi-color-border)',
-          borderRadius: 6,
-          background: 'var(--semi-color-fill-0)',
-          color: 'var(--semi-color-text-2)',
-          fontSize: 12,
-        }}
-      >
-        {expr}
-      </code>
-    </div>
-  );
-}
-
 export default function DynamicPricingBreakdown({ billingExpr, t }) {
   const { symbol, rate } = getCurrencyConfig();
   const { billingExpr: baseExpr, requestRuleExpr: ruleExpr } =
@@ -161,7 +118,9 @@ export default function DynamicPricingBreakdown({ billingExpr, t }) {
           </Avatar>
           <Text className='text-lg font-medium'>{t('动态计费')}</Text>
         </div>
-        <RawExpressionBlock expr={billingExpr} t={t} />
+        <div className='text-sm text-gray-500'>
+          {t('请联系管理员确认价格详情')}
+        </div>
       </div>
     );
   }
@@ -349,13 +308,6 @@ export default function DynamicPricingBreakdown({ billingExpr, t }) {
           ))}
         </div>
       )}
-
-      <details style={{ marginTop: 12 }}>
-        <summary className='cursor-pointer text-sm text-gray-500'>
-          {t('查看原始计费表达式')}
-        </summary>
-        <RawExpressionBlock expr={billingExpr} t={t} />
-      </details>
     </div>
   );
 }
