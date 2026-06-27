@@ -187,11 +187,11 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
 
   columns.push(
     {
-      id: 'model',
+      id: 'model_name',
       header: t('Model'),
       accessorFn: (row) => getTaskModelName(row),
       cell: ({ row }) => {
-        const modelName = row.getValue('model') as string
+        const modelName = row.getValue('model_name') as string
         if (!modelName) {
           return <span className='text-muted-foreground/60 text-xs'>-</span>
         }
