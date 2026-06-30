@@ -177,13 +177,7 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 		if err := common.Unmarshal(cachedBody, &bodyMap); err == nil {
 			bodyMap["model"] = info.UpstreamModelName
 			if shouldUseVeoReferenceImages(info, bodyMap) {
-				if images := collectVeoImages(bodyMap); len(images) > 2 {
-					bodyMap["Ingredients_images"] = images
-				} else if len(images) > 0 {
-					bodyMap["images"] = images
-				}
-				delete(bodyMap, "image")
-				delete(bodyMap, "input_reference")
+				applyVeoReferenceImages(bodyMap)
 			}
 			if seconds, ok := normalizeVideoSeconds(bodyMap["seconds"]); ok {
 				bodyMap["seconds"] = seconds
@@ -255,10 +249,27 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 }
 
 func shouldUseVeoReferenceImages(info *relaycommon.RelayInfo, body map[string]interface{}) bool {
-	if info == nil || strings.TrimSpace(info.OriginModelName) != "veo-omni-flash" {
+	if info == nil {
+		return false
+	}
+	if strings.TrimSpace(info.OriginModelName) != "veo-omni-flash" &&
+		strings.TrimSpace(info.UpstreamModelName) != "veo-omni-flash" {
 		return false
 	}
 	return len(collectVeoImages(body)) > 0
+}
+
+func applyVeoReferenceImages(body map[string]interface{}) {
+	images := collectVeoImages(body)
+	if len(images) > 2 {
+		body["Ingredients_images"] = images
+		delete(body, "images")
+	} else if len(images) > 0 {
+		body["images"] = images
+		delete(body, "Ingredients_images")
+	}
+	delete(body, "image")
+	delete(body, "input_reference")
 }
 
 func collectVeoImages(body map[string]interface{}) []string {
@@ -266,23 +277,33 @@ func collectVeoImages(body map[string]interface{}) []string {
 		return nil
 	}
 	images := make([]string, 0)
+	seen := make(map[string]bool)
+	appendImage := func(image string) {
+		image = strings.TrimSpace(image)
+		if image == "" || seen[image] {
+			return
+		}
+		seen[image] = true
+		images = append(images, image)
+	}
 	appendImages := func(v any) {
 		switch typed := v.(type) {
 		case []string:
-			images = append(images, typed...)
+			for _, image := range typed {
+				appendImage(image)
+			}
 		case []any:
 			for _, item := range typed {
-				if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
-					images = append(images, strings.TrimSpace(s))
+				if s, ok := item.(string); ok {
+					appendImage(s)
 				}
 			}
 		case string:
-			if strings.TrimSpace(typed) != "" {
-				images = append(images, strings.TrimSpace(typed))
-			}
+			appendImage(typed)
 		}
 	}
 
+	appendImages(body["Ingredients_images"])
 	appendImages(body["images"])
 	appendImages(body["image"])
 	appendImages(body["input_reference"])

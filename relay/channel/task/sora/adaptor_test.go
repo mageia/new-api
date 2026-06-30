@@ -122,3 +122,41 @@ func TestNormalizeVideoSecondsFromFormUsesDurationFallback(t *testing.T) {
 	require.Equal(t, "15", normalizeVideoSecondsFromForm(map[string][]string{"duration": {"15s"}}))
 	require.Equal(t, "10", normalizeVideoSecondsFromForm(map[string][]string{"seconds": {"10s"}, "duration": {"15s"}}))
 }
+
+func TestApplyVeoReferenceImagesUsesIngredientsForMoreThanTwoImages(t *testing.T) {
+	body := map[string]any{
+		"images": []any{
+			"https://example.com/1.png",
+			"https://example.com/2.png",
+			"https://example.com/3.png",
+			"https://example.com/4.png",
+		},
+	}
+
+	applyVeoReferenceImages(body)
+
+	require.NotContains(t, body, "images")
+	require.Equal(t, []string{
+		"https://example.com/1.png",
+		"https://example.com/2.png",
+		"https://example.com/3.png",
+		"https://example.com/4.png",
+	}, body["Ingredients_images"])
+}
+
+func TestApplyVeoReferenceImagesUsesImagesForAtMostTwoImages(t *testing.T) {
+	body := map[string]any{
+		"Ingredients_images": []any{
+			"https://example.com/1.png",
+			"https://example.com/2.png",
+		},
+	}
+
+	applyVeoReferenceImages(body)
+
+	require.NotContains(t, body, "Ingredients_images")
+	require.Equal(t, []string{
+		"https://example.com/1.png",
+		"https://example.com/2.png",
+	}, body["images"])
+}
