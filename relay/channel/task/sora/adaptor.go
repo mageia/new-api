@@ -57,10 +57,33 @@ type responseTask struct {
 	Video              *struct {
 		URL string `json:"url,omitempty"`
 	} `json:"video,omitempty"`
-	Error *struct {
-		Message string `json:"message"`
-		Code    string `json:"code"`
-	} `json:"error,omitempty"`
+	Error *responseTaskError `json:"error,omitempty"`
+}
+
+type responseTaskError struct {
+	Message string `json:"message"`
+	Code    string `json:"code"`
+}
+
+func (e *responseTaskError) UnmarshalJSON(data []byte) error {
+	if strings.TrimSpace(string(data)) == "null" {
+		return nil
+	}
+
+	var message string
+	if err := common.Unmarshal(data, &message); err == nil {
+		e.Message = message
+		return nil
+	}
+
+	type alias responseTaskError
+	var parsed alias
+	if err := common.Unmarshal(data, &parsed); err != nil {
+		return err
+	}
+	e.Message = parsed.Message
+	e.Code = parsed.Code
+	return nil
 }
 
 func extractResponseTaskVideoURL(task responseTask) string {

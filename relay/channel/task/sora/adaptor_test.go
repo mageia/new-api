@@ -180,3 +180,35 @@ func TestEstimateVideoSecondsSeedanceGatewayDefaultsToFifteen(t *testing.T) {
 func TestModelListIncludesSeedanceGateway(t *testing.T) {
 	require.Contains(t, (&TaskAdaptor{}).GetModelList(), "seedance-gateway")
 }
+
+func TestParseTaskResultAcceptsStringError(t *testing.T) {
+	body := []byte(`{
+		"id":"task_upstream",
+		"model":"seedance-gateway",
+		"status":"failed",
+		"progress":0,
+		"error":"生成失败，请稍后重试"
+	}`)
+
+	info, err := (&TaskAdaptor{}).ParseTaskResult(body)
+	require.NoError(t, err)
+	require.NotNil(t, info)
+	require.Equal(t, string(model.TaskStatusFailure), info.Status)
+	require.Equal(t, "生成失败，请稍后重试", info.Reason)
+}
+
+func TestParseTaskResultAcceptsObjectError(t *testing.T) {
+	body := []byte(`{
+		"id":"task_upstream",
+		"model":"seedance-gateway",
+		"status":"failed",
+		"progress":0,
+		"error":{"message":"生成失败","code":"upstream_failed"}
+	}`)
+
+	info, err := (&TaskAdaptor{}).ParseTaskResult(body)
+	require.NoError(t, err)
+	require.NotNil(t, info)
+	require.Equal(t, string(model.TaskStatusFailure), info.Status)
+	require.Equal(t, "生成失败", info.Reason)
+}
