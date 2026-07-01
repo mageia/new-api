@@ -43,6 +43,24 @@ func TestConvertToRequestPayloadSeedance20UsesInputObject(t *testing.T) {
 	require.Contains(t, string(body), `"end_frames":["https://example.com/end.png"]`)
 }
 
+func TestConvertToRequestPayloadDefaultsSeedance20Resolution(t *testing.T) {
+	adaptor := &TaskAdaptor{}
+	payload, err := adaptor.convertToRequestPayload(&relaycommon.TaskSubmitReq{
+		Model:    "seedance-2.0",
+		Prompt:   "run",
+		Duration: 15,
+		Metadata: map[string]any{"aspect_ratio": "9:16"},
+	}, &relaycommon.RelayInfo{})
+	require.NoError(t, err)
+
+	body, ok := payload.(map[string]any)
+	require.True(t, ok)
+	input, ok := body["input"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "9:16", input["aspect_ratio"])
+	require.Equal(t, "720p", input["resolution"])
+}
+
 func TestConvertToRequestPayloadUsesMappedUpstreamModel(t *testing.T) {
 	adaptor := &TaskAdaptor{}
 	payload, err := adaptor.convertToRequestPayload(&relaycommon.TaskSubmitReq{

@@ -434,7 +434,7 @@ func mergeYoboxRequestMetadata(c *gin.Context, req *relaycommon.TaskSubmitReq) {
 	if req.Metadata == nil {
 		req.Metadata = map[string]any{}
 	}
-	for _, key := range []string{"content", "ratio", "resolution", "generate_audio", "audio", "n"} {
+	for _, key := range []string{"content", "ratio", "aspect_ratio", "resolution", "generate_audio", "audio", "n"} {
 		if v, ok := raw[key]; ok {
 			req.Metadata[key] = v
 		}
@@ -506,10 +506,10 @@ func defaultYoboxAspectRatio(size string) string {
 
 func defaultYoboxResolution(size string) string {
 	switch strings.TrimSpace(size) {
-	case "720x1280", "1280x720", "720x720":
+	case "720x1280", "1280x720", "720x720", "":
 		return "720p"
 	default:
-		return ""
+		return "720p"
 	}
 }
 
