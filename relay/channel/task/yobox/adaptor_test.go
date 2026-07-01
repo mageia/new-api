@@ -94,6 +94,55 @@ func TestParseTaskResultExtractsOutputsVideoURL(t *testing.T) {
 	require.Equal(t, "https://example.com/out.mp4", info.Url)
 }
 
+func TestParseTaskResultExtractsNestedSeedance20Outputs(t *testing.T) {
+	adaptor := &TaskAdaptor{}
+	info, err := adaptor.ParseTaskResult([]byte(`{
+		"success": true,
+		"message": "",
+		"data": {
+			"task_id": "task_nested",
+			"status": "SUCCESS",
+			"progress": 100,
+			"fail_reason": "",
+			"data": {
+				"id": "task_nested",
+				"status": "completed",
+				"phase": "completed",
+				"outputs": ["https://example.com/out.mp4"]
+			}
+		}
+	}`))
+	require.NoError(t, err)
+	require.Equal(t, "task_nested", info.TaskID)
+	require.Equal(t, string(model.TaskStatusSuccess), info.Status)
+	require.Equal(t, "https://example.com/out.mp4", info.Url)
+	require.Equal(t, "100%", info.Progress)
+}
+
+func TestParseTaskResultExtractsNestedFailureReason(t *testing.T) {
+	adaptor := &TaskAdaptor{}
+	info, err := adaptor.ParseTaskResult([]byte(`{
+		"success": true,
+		"message": "",
+		"data": {
+			"task_id": "task_failed",
+			"status": "FAILURE",
+			"progress": 100,
+			"fail_reason": "下载图片失败，HTTP 404",
+			"data": {
+				"status": "failed",
+				"phase": "failed",
+				"error": "下载图片失败，HTTP 404"
+			}
+		}
+	}`))
+	require.NoError(t, err)
+	require.Equal(t, "task_failed", info.TaskID)
+	require.Equal(t, string(model.TaskStatusFailure), info.Status)
+	require.Equal(t, "下载图片失败，HTTP 404", info.Reason)
+	require.Equal(t, "100%", info.Progress)
+}
+
 func TestMergeYoboxRequestMetadataExtractsContentImages(t *testing.T) {
 	req := &relaycommon.TaskSubmitReq{
 		Metadata: map[string]any{

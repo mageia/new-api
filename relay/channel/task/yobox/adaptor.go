@@ -32,21 +32,45 @@ var modelList = []string{
 }
 
 type responseTask struct {
-	TaskID string `json:"task_id"`
-	Status string `json:"status"`
-	Data   struct {
-		ID         string   `json:"id"`
-		Model      string   `json:"model"`
-		Status     string   `json:"status"`
-		Progress   int      `json:"progress"`
-		VideoURL   string   `json:"video_url"`
-		Outputs    []string `json:"outputs"`
-		URL        string   `json:"url"`
-		Seconds    int      `json:"seconds"`
-		Phase      string   `json:"phase"`
-		Error      string   `json:"error"`
-		FailReason string   `json:"fail_reason"`
-	} `json:"data"`
+	Success    bool              `json:"success"`
+	Message    string            `json:"message"`
+	TaskID     string            `json:"task_id"`
+	Status     string            `json:"status"`
+	Progress   int               `json:"progress"`
+	FailReason string            `json:"fail_reason"`
+	Data       yoboxTaskEnvelope `json:"data"`
+}
+
+type yoboxTaskEnvelope struct {
+	TaskID     string           `json:"task_id"`
+	Status     string           `json:"status"`
+	Progress   int              `json:"progress"`
+	FailReason string           `json:"fail_reason"`
+	Data       yoboxTaskPayload `json:"data"`
+
+	// Legacy/direct task payload fields kept for compatibility with older mocks.
+	ID       string   `json:"id"`
+	Model    string   `json:"model"`
+	VideoURL string   `json:"video_url"`
+	Outputs  []string `json:"outputs"`
+	URL      string   `json:"url"`
+	Seconds  int      `json:"seconds"`
+	Phase    string   `json:"phase"`
+	Error    string   `json:"error"`
+}
+
+type yoboxTaskPayload struct {
+	ID         string   `json:"id"`
+	Object     string   `json:"object"`
+	Model      string   `json:"model"`
+	Status     string   `json:"status"`
+	VideoURL   string   `json:"video_url"`
+	Outputs    []string `json:"outputs"`
+	URL        string   `json:"url"`
+	Seconds    int      `json:"seconds"`
+	Phase      string   `json:"phase"`
+	Error      string   `json:"error"`
+	FailReason string   `json:"fail_reason"`
 }
 
 type submitResponse struct {
@@ -196,17 +220,17 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 		return nil, errors.Wrap(err, "unmarshal task result failed")
 	}
 	info := &relaycommon.TaskInfo{Code: 0}
-	info.TaskID = parsed.TaskID
-	status := mapYoboxStatus(parsed.Status)
+	info.TaskID = firstNonEmpty(parsed.Data.TaskID, parsed.TaskID, parsed.Data.Data.ID, parsed.Data.ID)
+	status := mapYoboxStatus(firstNonEmpty(parsed.Data.Status, parsed.Status, parsed.Data.Data.Status, parsed.Data.Data.Phase, parsed.Data.Phase))
 	info.Status = string(status)
-	info.Progress = progressString(parsed.Data.Progress, status)
+	info.Progress = progressString(firstPositive(parsed.Data.Progress, parsed.Progress), status)
 	if status == model.TaskStatusSuccess {
-		info.Url = firstNonEmpty(parsed.Data.VideoURL, firstString(parsed.Data.Outputs), parsed.Data.URL)
+		info.Url = firstNonEmpty(parsed.Data.Data.VideoURL, firstString(parsed.Data.Data.Outputs), parsed.Data.Data.URL, parsed.Data.VideoURL, firstString(parsed.Data.Outputs), parsed.Data.URL)
 		info.Progress = "100%"
 	}
 	if status == model.TaskStatusFailure {
 		info.Progress = "100%"
-		info.Reason = firstNonEmpty(parsed.Data.FailReason, parsed.Data.Error, parsed.Data.Phase, "task failed")
+		info.Reason = firstNonEmpty(parsed.Data.FailReason, parsed.FailReason, parsed.Data.Data.FailReason, parsed.Data.Data.Error, parsed.Data.Data.Phase, parsed.Data.Error, parsed.Data.Phase, parsed.Message, "task failed")
 	}
 	return info, nil
 }
@@ -511,6 +535,15 @@ func defaultYoboxResolution(size string) string {
 	default:
 		return "720p"
 	}
+}
+
+func firstPositive(values ...int) int {
+	for _, value := range values {
+		if value > 0 {
+			return value
+		}
+	}
+	return 0
 }
 
 func firstVideoURL(task *model.Task) string {
