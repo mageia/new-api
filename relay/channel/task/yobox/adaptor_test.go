@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/stretchr/testify/require"
@@ -141,6 +142,48 @@ func TestParseTaskResultExtractsNestedFailureReason(t *testing.T) {
 	require.Equal(t, string(model.TaskStatusFailure), info.Status)
 	require.Equal(t, "下载图片失败，HTTP 404", info.Reason)
 	require.Equal(t, "100%", info.Progress)
+}
+
+func TestConvertToOpenAIVideoIncludesResultURL(t *testing.T) {
+	task := &model.Task{
+		TaskID:     "task_public",
+		Status:     model.TaskStatusSuccess,
+		Progress:   "100%",
+		CreatedAt:  100,
+		UpdatedAt:  200,
+		Properties: model.Properties{OriginModelName: "seedance-2.0-yo"},
+		PrivateData: model.TaskPrivateData{
+			ResultURL: "https://example.com/out.mp4",
+		},
+	}
+	body, err := (&TaskAdaptor{}).ConvertToOpenAIVideo(task)
+	require.NoError(t, err)
+
+	var video dto.OpenAIVideo
+	require.NoError(t, common.Unmarshal(body, &video))
+	require.Equal(t, "task_public", video.ID)
+	require.Equal(t, dto.VideoStatusCompleted, video.Status)
+	require.Equal(t, "https://example.com/out.mp4", video.Metadata["url"])
+	require.Equal(t, "https://example.com/out.mp4", video.Metadata["video_url"])
+	require.Equal(t, "https://example.com/out.mp4", video.Metadata["result_url"])
+}
+
+func TestConvertToOpenAIVideoExtractsNestedOutputFallback(t *testing.T) {
+	task := &model.Task{
+		TaskID:     "task_public",
+		Status:     model.TaskStatusSuccess,
+		Progress:   "100%",
+		CreatedAt:  100,
+		UpdatedAt:  200,
+		Properties: model.Properties{OriginModelName: "seedance-2.0-yo"},
+		Data:       []byte(`{"success":true,"data":{"data":{"outputs":["https://example.com/nested.mp4"]}}}`),
+	}
+	body, err := (&TaskAdaptor{}).ConvertToOpenAIVideo(task)
+	require.NoError(t, err)
+
+	var video dto.OpenAIVideo
+	require.NoError(t, common.Unmarshal(body, &video))
+	require.Equal(t, "https://example.com/nested.mp4", video.Metadata["url"])
 }
 
 func TestMergeYoboxRequestMetadataExtractsContentImages(t *testing.T) {

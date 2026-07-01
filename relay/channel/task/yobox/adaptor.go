@@ -244,8 +244,10 @@ func (a *TaskAdaptor) ConvertToOpenAIVideo(originTask *model.Task) ([]byte, erro
 	ov.SetProgressStr(originTask.Progress)
 	ov.CreatedAt = originTask.CreatedAt
 	ov.CompletedAt = originTask.UpdatedAt
-	if url := firstVideoURL(originTask); url != "" {
+	if url := firstNonEmpty(originTask.GetResultURL(), firstVideoURL(originTask)); url != "" {
 		ov.SetMetadata("url", url)
+		ov.SetMetadata("video_url", url)
+		ov.SetMetadata("result_url", url)
 	}
 	if originTask.Status == model.TaskStatusFailure {
 		ov.Error = &dto.OpenAIVideoError{Message: originTask.FailReason, Code: "failure"}
@@ -550,23 +552,10 @@ func firstVideoURL(task *model.Task) string {
 	if task == nil || len(task.Data) == 0 {
 		return ""
 	}
-	var payload map[string]any
-	if err := common.Unmarshal(task.Data, &payload); err != nil {
-		return ""
-	}
-	if data, ok := payload["data"].(map[string]any); ok {
-		if url, ok := data["video_url"].(string); ok && strings.TrimSpace(url) != "" {
-			return strings.TrimSpace(url)
-		}
-		if urls, ok := data["outputs"].([]any); ok {
-			for _, item := range urls {
-				if url, ok := item.(string); ok && strings.TrimSpace(url) != "" {
-					return strings.TrimSpace(url)
-				}
-			}
-		}
-		if url, ok := data["url"].(string); ok && strings.TrimSpace(url) != "" {
-			return strings.TrimSpace(url)
+	var parsed responseTask
+	if err := common.Unmarshal(task.Data, &parsed); err == nil {
+		if url := firstNonEmpty(parsed.Data.Data.VideoURL, firstString(parsed.Data.Data.Outputs), parsed.Data.Data.URL, parsed.Data.VideoURL, firstString(parsed.Data.Outputs), parsed.Data.URL); url != "" {
+			return url
 		}
 	}
 	return ""
